@@ -1,7 +1,7 @@
 # Q-Brain — LoxBerry-plugin en lokale energie-assistent
 
 Lokale energie-observatie en AI-advies via **MCP → Loxone** en **Ollama**.
-Versie 0.3.1 hergebruikt de Miniserver via de LoxBerry PHP SDK, zoekt automatisch
+Versie 0.4.0 hergebruikt de Miniserver via de LoxBerry PHP SDK, zoekt automatisch
 naar ondersteunde energiemeetpunten en toont lokale analyses. Eén startknop regelt
 services en modeldownload. Credentials blijven op de LoxBerry-host. Niet ondersteunde
 blokken en dubbelzinnige meetpunten worden expliciet gemeld; zie de handleiding.
@@ -10,7 +10,12 @@ De zelfstandige Docker-variant met handmatige mappings blijft beschikbaar.
 Sinds 0.2.1 installeert het pluginpakket ontbrekende hostdependencies, waaronder
 Docker Engine, Compose en Buildx. 0.3.1 voegt PHP curl/XML toe.
 
-**Nieuw in 0.3.3:** geen certificaat- of hostnaamcontrole bij de lokale Miniserververbinding.
+**Nieuw in 0.4.0:** WebSocket-uitlezing van Meter en Wallbox2, meetwaarden per apparaat
+en het lokale ontdekkingsmodel `qbrain-discovery:latest`. Dit onderzoekt blokken,
+state-velden en ontbrekende informatie, ook zonder volledige energiesnapshot.
+Het hergebruikt de gewichten van het ingestelde Ollama-model.
+
+**Sinds 0.3.3:** geen certificaat- of hostnaamcontrole bij de lokale Miniserververbinding.
 
 **Sinds 0.3.2:** compatibiliteit met de PHP SDK van LoxBerry 4.0.0, specifieke
 SDK-foutmeldingen en lokaal bouwen voordat Q-Brain en de agent starten.
@@ -19,7 +24,7 @@ SDK-foutmeldingen en lokaal bouwen voordat Q-Brain en de agent starten.
 is eenmalig de nieuwe ZIP-installatie nodig om de updatebron toe te voegen.
 
 **LoxBerry installeren:** volg [de LoxBerry-handleiding](docs/LOXBERRY.md).
-Download [het installatie-ZIP](https://github.com/Q-Home/Q-Brain/raw/refs/heads/main/packages/qbrain-loxberry-0.3.3.zip).
+Download [het installatie-ZIP](https://github.com/Q-Home/Q-Brain/raw/refs/heads/main/packages/qbrain-loxberry-0.4.0.zip).
 Bouw het installatiepakket met `python scripts/build_loxberry.py`. Gebruik het
 gegenereerde ZIP onder `dist/`, niet het GitHub-broncodearchief.
 
@@ -55,7 +60,8 @@ flowchart LR
   X --> F[Realtime regeling / watchdog / fysieke grenzen]
 ```
 
-MCP is de interface van deze bridge; Loxone zelf spreekt hier HTTP, geen MCP.
+MCP is de interface van deze bridge. De LoxBerry-reader gebruikt HTTP voor de
+structuur en WebSockets voor numerieke states; de zelfstandige adapter gebruikt HTTP.
 De server haalt voor elk advies een nieuwe snapshot op. De agent doet dat standaard
 elke 300 seconden, gerekend vanaf het einde van de vorige cyclus. Bij fouten blijft
 de agent draaien en probeert hij pas in de volgende cyclus opnieuw. Alleen advies
@@ -104,7 +110,9 @@ initialize-handshake voordat hij een tool oproept.
 
 | Tool | Gedrag |
 |---|---|
-| `get_energy_snapshot` | Vijf actuele signalen, bron en Unix UTC-tijdstempel |
+| `get_energy_snapshot` | Bekende signalen en metingen per apparaat met eenheden en tijdstempel |
+| `discover_energy_signals` | Gevonden blokken, meetwaarden en ambiguïteit |
+| `analyze_installation` | Lokale AI onderzoekt gevonden metadata en stelt mogelijke rollen voor |
 | `get_energy_history(limit=20)` | Nieuwste metingen, adviezen en audit; maximaal 100 records |
 | `get_operating_mode` | Demo/observe-status, EV-write-status en sitegrens |
 | `analyze_energy` | Nieuwe snapshot → Ollama → gevalideerd advies → historie; `executed=false` |
@@ -138,8 +146,8 @@ De adapter gebruikt `GET /dev/sps/io/<mapping>/state`, HTTP Basic-authenticatie
 en een gevalideerde XML-`LL`-response met `Code=200`. Volgens de
 [Loxone-webservicedocumentatie](https://www.loxone.com/dede/kb/webservices/)
 zijn statusvragen voor ingangen/uitgangen bedoeld en niet voor functieblokken.
-Gebruik dus geen willekeurige UUID uit een functieblok. Automatische discovery en
-WebSocket/tokenauthenticatie vallen buiten dit MVP. Controleer Basic-auth-ondersteuning
+Gebruik dus geen willekeurige UUID uit een functieblok. Deze zelfstandige HTTP-adapter gebruikt geen automatische discovery of WebSockets;
+de LoxBerry-variant ondersteunt die wel, zie [de handleiding](docs/LOXBERRY.md). Controleer Basic-auth-ondersteuning
 op jouw firmware; een loginfout resulteert in onbeschikbare data, nooit een authfallback.
 
 HTTPS-certificaten worden gecontroleerd. Voor een private CA kun je een CA-bundle
@@ -206,6 +214,8 @@ Alle instellingen staan in `.env.example`; de service valideert deze bij het sta
 | `REQUEST_TIMEOUT_SECONDS` | 5; 1–30; Loxone en model-readiness |
 | `OLLAMA_URL`, `OLLAMA_MODEL` | `http://ollama:11434`, `qwen3:4b` |
 | `OLLAMA_TIMEOUT_SECONDS` | 120; 1–600 |
+| `DISCOVERY_MODEL` | Leeg: gebruik OLLAMA_MODEL; LoxBerry stelt qbrain-discovery:latest in |
+| `DISCOVERY_TIMEOUT_SECONDS` | 300; 1–600 |
 | `REASONING_INTERVAL_SECONDS` | 300; 10–86400 |
 | `HISTORY_PATH`, `HISTORY_MAX_ROWS` | `/data/history.sqlite3`, 10000; gezamenlijke eventretentie |
 

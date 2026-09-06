@@ -10,9 +10,9 @@ from .logging import event, setup_logging
 
 async def cycle(c):
     async with httpx.AsyncClient(headers={"Authorization": f"Bearer {c.mcp_token.get_secret_value()}"},
-                                 timeout=c.ollama_timeout_seconds + 30, trust_env=False) as http:
+                                 timeout=c.ollama_timeout_seconds + c.discovery_timeout_seconds + 30, trust_env=False) as http:
         async with streamable_http_client(c.mcp_url, http_client=http) as (read, write, _):
-            async with ClientSession(read, write, read_timeout_seconds=timedelta(seconds=c.ollama_timeout_seconds + 30)) as session:
+            async with ClientSession(read, write, read_timeout_seconds=timedelta(seconds=c.ollama_timeout_seconds + c.discovery_timeout_seconds + 30)) as session:
                 await session.initialize()
                 result = await session.call_tool("analyze_energy", {})
                 if result.isError:

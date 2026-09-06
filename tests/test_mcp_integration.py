@@ -41,10 +41,13 @@ class OllamaFixture(BaseHTTPRequestHandler):
         assert data["stream"] is False and "properties" in data["format"]
         self.send_response(200)
         self.end_headers()
+        if 'proposals' in data['format']['properties']:
+            self.wfile.write(json.dumps({'message':{'content':json.dumps({'summary':'Installation discovery', 'proposals':[], 'missing_information':['No topology']})}}).encode())
+            return
         self.wfile.write(json.dumps({"message": {"content": json.dumps({"summary": "Demo observation", "confidence": "low", "reasons": ["No forecast supplied"], "suggested_ev_limit_w": 1000})}}).encode())
 
 
-@pytest.fixture(params=[False, True, "sdk"], ids=["observe", "controlled-write", "sdk"])
+@pytest.fixture(params=[False, True, "sdk", "metadata"], ids=["observe", "controlled-write", "sdk", "metadata-only"])
 def running_service(tmp_path, request):
     mock = FixtureServer(("127.0.0.1", 0), OllamaFixture)
     thread = threading.Thread(target=mock.serve_forever, daemon=True)
@@ -60,11 +63,14 @@ def running_service(tmp_path, request):
                    LOXONE_URL=f"http://127.0.0.1:{mock.server_port}", LOXONE_ALLOW_HTTP="true",
                    LOXONE_USERNAME="test", LOXONE_PASSWORD="secret", LOXONE_EV_LIMIT_INPUT="EVCap")
         env.update({f"LOXONE_{key}": key for key in ["GRID_POWER", "PV_POWER", "BATTERY_SOC", "BATTERY_POWER", "EV_POWER"]})
-    if request.param == "sdk":
+    if request.param in ("sdk", "metadata"):
         telemetry = tmp_path / "telemetry.json"
         telemetry.write_text(json.dumps({"timestamp": time.time(), "error": None, "readings": [
             {"id": "pv", "name": "PV vermogen", "value": 2, "format": "%.1f kW", "status": "read"}]}))
         env.update(DEMO_MODE="false", LOXBERRY_SNAPSHOT_PATH=str(telemetry))
+        if request.param == "metadata":
+            telemetry.write_text(json.dumps({"timestamp": time.time(), "error": None, "readings": [
+                {"id": "grid", "name": "Grid", "type": "Meter", "states": {"actual": "uuid"}, "status": "state_missing"}]}))
     process = subprocess.Popen([sys.executable, "-m", "uvicorn", "qbox.server:create_app", "--factory", "--host", "127.0.0.1", "--port", str(port), "--no-access-log"], env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     try:
         for _ in range(100):
@@ -95,18 +101,24 @@ async def test_full_mcp_cycle(running_service):
         assert (await client.get(url + "/overview")).status_code == 401
         assert (await client.post(url + "/mcp", json={})).status_code == 401
     async with httpx.AsyncClient(headers={"Authorization": f"Bearer {TOKEN}"}, trust_env=False, timeout=15) as client:
-        assert (await client.get(url + "/readyz")).status_code == 200
+        assert (await client.get(url + "/readyz")).status_code == (503 if mode == "metadata" else 200)
         assert (await client.get(url + "/overview")).status_code == 200
         async with streamable_http_client(url + "/mcp", http_client=client) as (read, write, _):
             async with ClientSession(read, write) as session:
                 await session.initialize()
                 names = {t.name for t in (await session.list_tools()).tools}
-                expected = {"get_energy_snapshot", "get_energy_history", "get_operating_mode", "analyze_energy", "discover_energy_signals"}
+                expected = {"get_energy_snapshot", "get_energy_history", "get_operating_mode", "analyze_energy", "discover_energy_signals", "analyze_installation"}
                 assert names == expected | ({"set_ev_power_limit"} if writes else set())
                 snap = await session.call_tool("get_energy_snapshot", {})
-                assert not snap.isError and json.loads(snap.content[0].text)["source"] == ("loxone" if mode else "demo")
+                if mode == "metadata":
+                    assert snap.isError
+                else:
+                    assert not snap.isError and json.loads(snap.content[0].text)["source"] == ("loxone" if mode else "demo")
                 advice = await session.call_tool("analyze_energy", {})
                 assert not advice.isError and json.loads(advice.content[0].text)["executed"] is False
+                if mode == "metadata":
+                    assert json.loads(advice.content[0].text)["kind"] == "discovery"
+                    assert (await client.get(url + "/overview")).json()["installation_analysis"]["payload"]["summary"] == "Installation discovery"
                 invalid = await session.call_tool("get_energy_history", {"limit": 10000})
                 assert invalid.isError
                 history = await session.call_tool("get_energy_history", {"limit": 10})

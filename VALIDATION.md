@@ -1,3 +1,14 @@
+# Validatie van Q-Brain 0.4.0
+
+84 tests geslaagd, 2 Linux-specifieke tests overgeslagen op Windows.
+Nieuw getest: echte PHP WebSocket-client tegen een TLS-protocolfixture, SHA1/SHA256
+JWT-authenticatie, numerieke UUID-tabellen met negatieve waarden, fragmentatie,
+ping/pong en tokenintrekking. Modelvoorstellen met verzonnen states en instelsliders
+worden geweigerd. Meerdere laadpunten en opslagmeters blijven aparte observaties.
+De echte HTTP-MCP-integratie test nu ook discovery zonder bruikbare meetwaarden.
+Ollama-antwoorden zijn fixtures; echte modelkwaliteit en de fysieke Miniserver zijn
+hiermee nog niet gevalideerd. CI controleert ook PHP/Bash en bouwt/start Docker.
+
 # Validatie van Q-Brain 0.3.3
 
 78 tests geslaagd, 2 Linux-specifieke tests overgeslagen op Windows.

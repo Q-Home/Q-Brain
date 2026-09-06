@@ -20,5 +20,9 @@ class History:
         return [{"timestamp": stamp, "kind": kind, "payload": json.loads(payload)} for stamp, kind, payload in
                 self.db.execute("SELECT timestamp,kind,payload FROM events ORDER BY id DESC LIMIT ?", (limit,))]
 
+    def latest(self, kind):
+        row = self.db.execute('SELECT timestamp,payload FROM events WHERE kind=? ORDER BY id DESC LIMIT 1', (kind,)).fetchone()
+        return {'timestamp':row[0], 'payload':json.loads(row[1])} if row else None
+
     def close(self):
         self.db.close()

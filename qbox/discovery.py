@@ -1,9 +1,10 @@
 """Conservative semantic discovery from the host SDK's credential-free readings."""
 import json
+import math
 import re
 import time
 from pathlib import Path
-from .models import Snapshot
+from .models import Snapshot, Observation
 
 KEYS = ('grid_power', 'pv_power', 'battery_soc', 'battery_power', 'ev_power')
 
@@ -17,6 +18,8 @@ def discover(document):
         unit = re.sub(r'%[-+0-9.]*[fdi]', '', fmt).strip()
         unit = unit.replace('%%', '%')
         factor = {'W': 1, 'kW': 1000, '%': 1}.get(unit)
+        if item.get('type') not in (None, 'InfoOnlyAnalog', 'Meter', 'Wallbox2'):
+            continue
         if factor is None or item.get('status') != 'read':
             continue
         value = item.get('value')
@@ -27,7 +30,7 @@ def discover(document):
             keys.append('battery_soc')
         if unit in ('W', 'kW'):
             if re.search(r'\bpv\b|solar|zonne|photovolta', name): keys.append('pv_power')
-            if re.search(r'laadpaal|wallbox|\bev\b', name): keys.append('ev_power')
+            if item.get('type') == 'Wallbox2' or re.search(r'laadpaal|wallbox|\bev\b', name): keys.append('ev_power')
             # Polarity is explicit in the configured name; never infer it from one sample.
             if re.search(r'grid|netvermogen|netz', name) and 'positive import' in name: keys.append('grid_power')
             if re.search(r'batter|accu', name) and 'positive charging' in name: keys.append('battery_power')
@@ -38,12 +41,38 @@ def discover(document):
         report[key] = {'status': 'found' if len(items) == 1 else 'ambiguous' if items else 'missing',
                        'candidates': [{'id': x['id'], 'name': x['name']} for x in items]}
         values[key] = items[0]['normalized_value'] if len(items) == 1 else None
-        if values[key] is not None and (not __import__('math').isfinite(values[key]) or
+        if values[key] is not None and (not math.isfinite(values[key]) or
                 (key in ('pv_power', 'ev_power', 'battery_soc') and values[key] < 0) or
                 (key == 'battery_soc' and values[key] > 100)):
             values[key] = None
             report[key]['status'] = 'invalid'
     return values, report
+
+
+def observations(document):
+    result=[]
+    for item in document.get('readings', [])[:100]:
+        if item.get('type') not in ('Meter','Wallbox2','InfoOnlyAnalog'):
+            continue
+        fields={'actual': item.get('format','')} if item.get('type') in ('Meter','Wallbox2') else {'value':item.get('format','')}
+        if item.get('type') == 'Meter' and item.get('details',{}).get('type') == 'storage':
+            fields['storage']=item.get('details',{}).get('storageFormat','')
+        live=item.get('state_values') or {'value':item.get('value')}
+        for field, fmt in fields.items():
+            unit=re.sub(r'%[-+0-9.]*[fdi]', '',str(fmt)).strip().replace('%%','%')
+            value=live.get(field)
+            if type(value) not in (int,float) or not math.isfinite(value):
+                continue
+            if unit in ('W','kW') and field in ('actual','value'):
+                value*=1000 if unit=='kW' else 1; unit='W'; quantity='power'
+            elif field=='storage' and unit in ('Wh','kWh','%') and value>=0:
+                quantity='soc' if unit=='%' else 'stored_energy'
+                if unit=='%' and value>100: continue
+            else: continue
+            result.append(Observation(control_id=item['id'],name=str(item.get('name',''))[:128],state=field,
+                          quantity=quantity,value=value,unit=unit,
+                          direction='consumption' if item.get('type')=='Wallbox2' else 'unknown'))
+    return result[:100]
 
 
 class LoxBerryAdapter:
@@ -61,15 +90,16 @@ class LoxBerryAdapter:
     async def snapshot(self):
         data = self.document()
         values, _ = discover(data)
-        if not any(v is not None for v in values.values()):
+        measured=observations(data)
+        if not measured and not any(v is not None for v in values.values()):
             raise ValueError('No unambiguous supported energy readings found')
-        return Snapshot(timestamp=data['timestamp'], source='loxone', **values)
+        return Snapshot(timestamp=data['timestamp'], source='loxone', observations=measured, **values)
 
     async def discovery(self):
         data = self.document()
         _, report = discover(data)
         return {'signals': report, 'readings': data.get('readings', []),
-                'timestamp': data['timestamp'], 'truncated': data.get('truncated', False)}
+                'timestamp': data['timestamp'], 'truncated': data.get('truncated', False), 'websocket':data.get('websocket',{})}
 
     async def close(self):
         pass

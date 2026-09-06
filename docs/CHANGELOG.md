@@ -1,5 +1,14 @@
 # Wijzigingen
 
+## 0.4.0
+
+- Numerieke WebSocket-states voor Meter, Wallbox2 en andere ondersteunde velden, met centrale LoxBerry-credentials.
+- Apart lokaal ontdekkingsprofiel qbrain-discovery:latest dat bestaande modelgewichten hergebruikt.
+- AI-ontdekking van rollen en ontbrekende informatie, ook zonder complete meetwaarden.
+- Analyse per laadpunt en batterij; geen onbewezen optelling, tekenrichting of SOC-conversie.
+- Gevalideerde voorstellen in de pluginpagina en MCP-tool analyze_installation.
+- Observe-only behouden; model krijgt geen credentials of uitvoerende tools.
+
 ## 0.3.3
 
 Certificaat- en hostnaamcontrole uitgeschakeld voor de lokale Miniserver, zowel

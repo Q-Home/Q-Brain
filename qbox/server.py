@@ -1,5 +1,7 @@
 import asyncio
 import hmac
+import time
+from .discovery_ai import inventory, fingerprint
 from contextlib import asynccontextmanager
 
 from mcp.server.fastmcp import FastMCP
@@ -34,7 +36,7 @@ def create_app(config=None):
 
     @mcp.tool()
     async def get_energy_snapshot() -> dict:
-        """Read the five mapped energy signals. W and SOC percent; timestamp is Unix UTC."""
+        """Read known energy signals and per-device observations with explicit units; timestamp is Unix UTC."""
         try:
             return (await service.snapshot()).model_dump()
         except Exception:
@@ -58,6 +60,29 @@ def create_app(config=None):
         return {"observe_only": c.observe_only, "demo_mode": c.demo_mode,
                 "ev_write_enabled": c.enable_ev_write, "ev_max_power_w": c.ev_max_power_w}
 
+    async def run_discovery():
+        if not isinstance(adapter, LoxBerryAdapter):
+            return None
+        rows=inventory(adapter.document())
+        key=fingerprint(rows,c.discovery_model or c.ollama_model)
+        previous=history.latest('discovery')
+        if previous and previous['payload'].get('fingerprint') == key and time.time()-previous['timestamp'] < 3600:
+            return previous['payload']
+        result=await ollama.discover(rows)
+        record={**result,'fingerprint':key, 'model':c.discovery_model or c.ollama_model,
+                'source':'loxone','executed':False}
+        history.append('discovery',record)
+        event('discovery_recorded',proposals=len(result['proposals']),executed=False)
+        return record
+
+    @mcp.tool()
+    async def analyze_installation() -> dict:
+        """Ask the local discovery model to inspect real control/state metadata, even without a complete snapshot."""
+        if reason_lock.locked():
+            raise ValueError('Analysis already running')
+        async with reason_lock:
+            return await run_discovery() or {'mode':'demo' if c.demo_mode else 'manual'}
+
     @mcp.tool()
     async def analyze_energy() -> dict:
         """Get structured local Ollama advice from fresh telemetry. Never executes advice."""
@@ -65,7 +90,19 @@ def create_app(config=None):
             raise ValueError("Analysis already running")
         async with reason_lock:
             try:
-                snapshot = await service.snapshot()
+                discovery = None
+                if isinstance(adapter, LoxBerryAdapter):
+                    try:
+                        discovery = await run_discovery()
+                    except Exception:
+                        event('discovery_failed')
+                        history.append('discovery_error', {'message':'Ontdekkingsanalyse nog niet beschikbaar. Controleer het model en probeer de volgende cyclus.'})
+                try:
+                    snapshot = await service.snapshot()
+                except Exception:
+                    if discovery is not None:
+                        return {'kind':'discovery','discovery':discovery,'executed':False}
+                    raise
                 advice = await ollama.reason(snapshot)
                 record = {"source": snapshot.source, "snapshot_timestamp": snapshot.timestamp,
                           "advice": advice.model_dump(), "executed": False}
@@ -97,7 +134,7 @@ def create_app(config=None):
 
     async def overview(request):
         # Cached local records only; never wait for Miniserver or model in the UI.
-        result = {"history": history.recent(10), "discovery": {}}
+        result = {"history": history.recent(6), "discovery": {}, "installation_analysis": history.latest("discovery"), "discovery_error": history.latest("discovery_error")}
         if isinstance(adapter, LoxBerryAdapter):
             try:
                 result["discovery"] = await adapter.discovery()

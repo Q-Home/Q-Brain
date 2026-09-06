@@ -82,16 +82,30 @@ try {
         if (!is_array($structure) || !is_array($structure['controls'] ?? null)) { throw new QBrainReadError('structure_invalid'); }
         $controls = $structure['controls'] ?? [];
         $candidates = [];
-        $scan = function(array $items, int $depth = 0) use (&$scan, &$candidates): void {
+        $scan = function(array $items, int $depth = 0) use (&$scan, &$candidates, $structure): void {
             if ($depth > 8) { return; }
             foreach ($items as $uuid => $control) {
                 if (!is_array($control)) { continue; }
                 $name = substr((string)($control['name'] ?? ''), 0, 128);
-                if (preg_match('/pv|solar|zonne|batter|accu|soc|grid|net|laad|ev\b|wallbox|charge|photovolta|netz/i', $name)
+                if ((in_array($control['type'] ?? '', ['Meter','Wallbox2','EnergyManager2','InfoOnlyAnalog'], true) || preg_match('/pv|solar|zonne|batter|accu|soc|grid|net|laad|ev\b|wallbox|charge|photovolta|netz/i', $name))
                     && preg_match('/^[a-f0-9-]{32,36}$/iD', (string)$uuid)) {
                     $candidates[(string)$uuid] = ['id' => (string)$uuid, 'name' => $name,
-                        'type' => (string)($control['type'] ?? ''),
-                        'format' => substr((string)($control['details']['format'] ?? ''), 0, 64)];
+                        'type' => substr((string)($control['type'] ?? ''),0,64),
+                        'format' => substr((string)($control['details']['actualFormat'] ?? $control['details']['format'] ?? ''), 0, 64),
+                        'room' => substr((string)($structure['rooms'][$control['room'] ?? '']['name'] ?? ''),0,64),
+                        'category' => substr((string)($structure['cats'][$control['cat'] ?? '']['name'] ?? ''),0,64),
+                        'states' => [], 'details' => []];
+                    foreach (['actual','total','storage','value','position','active','connected','enabled','Gpwr','Spwr','Ppwr','Ssoc'] as $field) {
+                        $state=$control['states'][$field] ?? null;
+                        if (is_string($state) && preg_match('/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{16}$/iD',$state)) {
+                            $candidates[(string)$uuid]['states'][$field]=strtolower($state);
+                        }
+                    }
+                    foreach (['type','actualFormat','totalFormat','storageFormat','storageMax','format','min','max','connectedInputs'] as $field) {
+                        $detail=$control['details'][$field] ?? null;
+                        if (is_string($detail)) { $candidates[(string)$uuid]['details'][$field]=substr($detail,0,128); }
+                        elseif (is_numeric($detail)) { $candidates[(string)$uuid]['details'][$field]=$detail; }
+                    }
                 }
                 if (is_array($control['subControls'] ?? null)) { $scan($control['subControls'], $depth + 1); }
             }
@@ -104,7 +118,7 @@ try {
             $candidate['status'] = 'unsupported_control';
             // Only a scalar read-only analogue display is supported by this first reader.
             // Function-block state UUIDs are NOT treated as HTTP input/output UUIDs.
-            if ($candidate['type'] === 'InfoOnlyAnalog' && $attempts < 20 && microtime(true) < $deadline) {
+            if ($candidate['type'] === 'InfoOnlyAnalog' && !$candidate['states'] && $attempts < 20 && microtime(true) < $deadline) {
                 $attempts++;
                 try {
                     $raw = $read('/dev/sps/io/' . $candidate['id'] . '/all');
@@ -129,7 +143,24 @@ try {
             }
             $readings[] = $candidate;
         }
-        $result += ['timestamp' => time(), 'miniserver_id' => $id, 'readings' => $readings,
+        $wanted=[];
+        foreach ($readings as $reading) { foreach ($reading['states'] as $uuid) { $wanted[$uuid]=true; } }
+        $ws=['values'=>[], 'error'=>null];
+        if ($wanted) {
+            require_once __DIR__.'/loxberry_ws.php';
+            $ws=qbrain_socket_values($servers[$id],array_keys($wanted),gethostname().$home.($installation['folder'] ?? 'qbrain'));
+        }
+        foreach ($readings as &$reading) {
+            $reading['state_values']=[];
+            foreach ($reading['states'] as $field=>$uuid) { $reading['state_values'][$field]=$ws['values'][$uuid] ?? null; }
+            if ($reading['states']) {
+                $field=in_array($reading['type'],['Meter','Wallbox2'],true) ? 'actual' : ($reading['type']==='Slider' ? 'position' : 'value');
+                $reading['value']=$reading['state_values'][$field] ?? null;
+                $reading['status']=count(array_filter($reading['state_values'],fn($v)=>$v!==null)) ? 'read' : 'state_missing';
+            }
+        }
+        unset($reading);
+        $result += ['websocket'=>['error'=>$ws['error']], 'timestamp' => time(), 'miniserver_id' => $id, 'readings' => $readings,
                     'truncated' => count($candidates) > 100, 'error' => null];
     } elseif (($argv[1] ?? '') !== 'list') { throw new RuntimeException('Unknown operation'); }
     ob_end_clean();

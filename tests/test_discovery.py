@@ -69,6 +69,7 @@ def sdk(tmp_path):
     if not PHP: pytest.skip('PHP not available')
     libs = tmp_path / 'libs/phplib'; libs.mkdir(parents=True)
     shutil.copy(ROOT / 'bin/loxberry.php', tmp_path / 'loxberry.php')
+    shutil.copy(ROOT / 'bin/loxberry_ws.php', tmp_path / 'loxberry_ws.php')
     (tmp_path / 'installation.json').write_text(json.dumps({'home': str(tmp_path)}))
     (libs / 'loxberry_system.php').write_text('''<?php
 class LBSystem { static function get_miniservers() {
@@ -93,7 +94,7 @@ return ['<LL Code="200" value="0"/>', ['code'=>200,'error'=>0]];
     def run(action='collect', selected='', **env):
         trace = tmp_path / 'trace.jsonl'
         trace.write_text('')
-        options = ['-d', 'extension_dir=' + str(Path(PHP).parent / 'ext'), '-d', 'extension=curl'] if os.name == 'nt' else []
+        options = ['-d', 'extension_dir=' + str(Path(PHP).parent / 'ext'), '-d', 'extension=curl', '-d', 'extension=openssl'] if os.name == 'nt' else []
         result = subprocess.run([PHP, *options, str(tmp_path / 'loxberry.php'), action, selected],
                                 env={**os.environ, 'SDK_TRACE': str(trace), **env}, capture_output=True, text=True, timeout=5)
         return result, [json.loads(line) for line in trace.read_text().splitlines()]

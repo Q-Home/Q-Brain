@@ -28,6 +28,10 @@
   <section><h3>Gevonden energiegegevens</h3><p id="discovery-status"></p>
     <ul id="signals"></ul><details><summary>Gevonden meetpunten en ondersteuning</summary><ul id="readings"></ul></details>
   </section>
+  <section><h3>AI-ontdekking van je installatie</h3>
+    <p id="discovery-ai">De ontdekkingsassistent onderzoekt je installatie na de start.</p>
+    <p id="discovery-ai-time"></p><ul id="discovery-proposals"></ul><ul id="discovery-missing"></ul>
+  </section>
   <section><h3>Laatste analyse</h3><p id="advice">Er is nog geen analyse beschikbaar.</p><p id="advice-time"></p></section>
   <section><h3>Installatie- en servicelog</h3><button class="lb-btn" type="button" id="refresh-log">Log verversen</button>
     <pre id="operation-log" style="white-space:pre-wrap;max-height:20rem;overflow:auto"></pre></section>
@@ -94,7 +98,15 @@
     const labels = {grid_power: 'Netvermogen', pv_power: 'Zonnepanelen', battery_soc: 'Batterijlading', battery_power: 'Batterijvermogen', ev_power: 'Laadpaal'};
     const states = {found: 'gevonden', missing: 'niet herkend', ambiguous: 'meerdere kandidaten', invalid: 'ongeldige waarde'};
     list('signals', Object.entries(discovery.signals || {}).map(([key, value]) => labels[key] + ': ' + (states[value.status] || value.status)));
-    list('readings', (discovery.readings || []).map(x => x.name + ' (' + x.type + '): ' + (x.status === 'read' ? x.value + ' / ' + x.format : x.status === 'unsupported_control' ? 'dit blok wordt nog niet uitgelezen' : 'niet leesbaar')));
+    list('readings', (discovery.readings || []).map(x => x.name + ' (' + x.type + '): ' +
+      (x.status === 'read' ? (Object.entries(x.state_values || {}).filter(([,v]) => v !== null).map(([k,v]) => k + '=' + v).join(', ') || String(x.value)) + ' / ' + x.format :
+       x.status === 'state_missing' ? 'wacht op actuele Loxone-statuswaarden' : x.status === 'unsupported_control' ? 'alleen metadata beschikbaar' : 'niet leesbaar')));
+    if (discovery.websocket?.error) text('discovery-status', 'WebSocket-uitlezing: ' + discovery.websocket.error + '. De AI kan de gevonden configuratie wel onderzoeken.');
+    const analysis = data.overview?.installation_analysis;
+    text('discovery-ai', analysis ? analysis.payload.summary : (data.overview?.discovery_error?.payload?.message || 'Nog geen ontdekkingsanalyse. Het model wordt voorbereid; de agent probeert automatisch opnieuw.'));
+    text('discovery-ai-time', analysis ? 'Model: ' + analysis.payload.model + ' — ' + new Date(analysis.timestamp * 1000).toLocaleString() + ' — voorstellen, geen automatische configuratiewijzigingen' : '');
+    list('discovery-proposals', (analysis?.payload?.proposals || []).map(x => x.name + ' / ' + x.state + ' → ' + x.role + ': ' + x.reason));
+    list('discovery-missing', analysis?.payload?.missing_information || []);
     const latest = (data.overview?.history || []).find(x => x.kind === 'advice');
     text('advice', latest ? latest.payload.advice.summary : 'Nog geen analyse. Q-Brain wacht op leesbare meetwaarden en het AI-model.');
     text('advice-time', latest ? 'Bron: ' + latest.payload.source + ' — analyse van ' + new Date(latest.timestamp * 1000).toLocaleString() + ' — zekerheid: ' + latest.payload.advice.confidence : '');

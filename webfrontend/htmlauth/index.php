@@ -35,7 +35,7 @@ function qbrain_call(string $action, ?array $payload = null): array {
     }
     fclose($pipes[0]);
     stream_set_timeout($pipes[1], 40);
-    $output = stream_get_contents($pipes[1], 65536);
+    $output = stream_get_contents($pipes[1], 524288);
     $timedOut = stream_get_meta_data($pipes[1])['timed_out'];
     fclose($pipes[1]);
     if ($timedOut) {

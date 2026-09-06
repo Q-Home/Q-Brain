@@ -32,6 +32,8 @@ class Settings(BaseSettings):
     request_timeout_seconds: float = Field(5, ge=1, le=30)
     ollama_url: str = "http://ollama:11434"
     ollama_model: str = "qwen3:4b"
+    discovery_model: str = ""
+    discovery_timeout_seconds: float = Field(300, ge=1, le=600)
     ollama_timeout_seconds: float = Field(120, ge=1, le=600)
     reasoning_interval_seconds: float = Field(300, ge=10, le=86400)
     history_path: Path = Path("/data/history.sqlite3")

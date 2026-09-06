@@ -88,11 +88,11 @@ def compose_document(settings, runtime, folder):
     env = {k.upper(): str(settings[k]).lower() if isinstance(settings[k], bool) else str(settings[k])
            for k in DEFAULTS if k != 'mcp_port'}
     if settings.get('loxberry_sdk') and not settings['demo_mode']:
-        env.update(LOXBERRY_SNAPSHOT_PATH='/telemetry/snapshot.json', LOXONE_USERNAME='', LOXONE_PASSWORD='')
+        env.update(LOXBERRY_SNAPSHOT_PATH='/telemetry/snapshot.json', LOXONE_USERNAME='', LOXONE_PASSWORD='', DISCOVERY_MODEL='qbrain-discovery:latest')
     env.update(MCP_TOKEN=settings['mcp_token'], OBSERVE_ONLY='true', ENABLE_EV_WRITE='false',
                OLLAMA_URL='http://ollama:11434', HISTORY_PATH='/data/history.sqlite3')
     env = {k: v.replace('$', '$$') for k, v in env.items()}
-    common = {'image': 'qbrain-' + folder + ':0.3.3', 'environment': env,
+    common = {'image': 'qbrain-' + folder + ':0.4.0', 'environment': env,
               'pull_policy': 'never', 'read_only': True, 'tmpfs': ['/tmp'], 'cap_drop': ['ALL'],
               'security_opt': ['no-new-privileges:true'], 'restart': 'unless-stopped',
               'logging': {'driver': 'json-file', 'options': {'max-size': '10m', 'max-file': '3'}}}
@@ -102,7 +102,7 @@ def compose_document(settings, runtime, folder):
         'agent': {**common, 'environment': {**env, 'MCP_URL': 'http://qbox:8080/mcp'},
                   'command': ['python', '-m', 'qbox.agent'], 'healthcheck': {'disable': True},
                   'depends_on': {'qbox': {'condition': 'service_healthy'}}},
-        'ollama': {'image': 'ollama/ollama:0.11.10', 'volumes': ['ollama:/root/.ollama'],
+        'ollama': {'image': 'ollama/ollama:0.11.10', 'volumes': ['ollama:/root/.ollama', {'type':'bind', 'source':'/var/lib/qbrain/' + folder + '/discovery.Modelfile', 'target':'/qbrain-discovery.Modelfile', 'read_only':True}],
                    'restart': 'unless-stopped', 'logging': common['logging']},
     }, 'volumes': {'history': {}, 'ollama': {}}}
 
@@ -172,7 +172,7 @@ class Controller:
         home = read_json(self.runtime / 'installation.json')['home']
         result = subprocess.run(['/usr/bin/sudo', '-u', 'loxberry', '/usr/bin/php',
                                  str(self.runtime / 'loxberry.php'), action, selected],
-                                capture_output=True, timeout=30, env={**self.process_env(), 'LBHOMEDIR': home})
+                                capture_output=True, timeout=55 if action == 'collect' else 30, env={**self.process_env(), 'LBHOMEDIR': home})
         if len(result.stdout) > 1048576:
             raise ControlError('SDK-antwoord is te groot.')
         try:
@@ -259,6 +259,9 @@ class Controller:
                 raise ControlError('Docker Engine with Compose v2 is missing or unavailable')
             if action in ('start', 'pull'):
                 validate({}, settings)
+                modelfile = self.state / 'discovery.Modelfile'
+                modelfile.write_text('FROM ' + settings['ollama_model'] + '\nPARAMETER temperature 0\nSYSTEM Je bent de lokale Q-Brain ontdekkingsassistent voor Loxone. Beschrijf alleen waargenomen gegevens en maak onzekerheid expliciet.\n', encoding='utf-8')
+                os.chmod(modelfile,0o600)
                 atomic_json(self.compose_file, compose_document(settings, self.runtime, self.folder))
             if action in ('start', 'stop'):
                 atomic_json(self.state / 'desired.json', {'running': action == 'start'})
@@ -298,6 +301,8 @@ class Controller:
                 self.run('build', 'qbox')
                 self.run('up', '-d', '--no-build', 'qbox', 'ollama', 'agent')
                 self.ensure_model()
+                if self.settings()['loxberry_sdk'] and not self.settings()['demo_mode']:
+                    self.run('exec','-T','ollama','ollama','create','qbrain-discovery:latest','-f','/qbrain-discovery.Modelfile',timeout=180)
                 atomic_json(self.state / 'applied.json', {'revision': self.settings()['revision']})
             elif action == 'stop':
                 if self.compose_file.exists():

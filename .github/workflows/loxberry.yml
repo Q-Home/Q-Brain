@@ -20,6 +20,7 @@ jobs:
           php -l webfrontend/htmlauth/index.php
           php -l templates/index.php
           php -l bin/loxberry.php
+          php -l bin/loxberry_ws.php
           for script in preinstall.sh preroot.sh postroot.sh bin/dependencies.sh daemon/daemon uninstall/uninstall; do
             bash -n "$script"
           done

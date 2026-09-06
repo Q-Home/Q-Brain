@@ -1,4 +1,4 @@
-# Q-Brain voor LoxBerry 4 — versie 0.3.3
+# Q-Brain voor LoxBerry 4 — versie 0.4.0
 
 Q-Brain gebruikt de Miniserver die al in LoxBerry is ingesteld. De lokale
 LoxBerry PHP SDK leest de verbinding en meetwaarden; alleen meetgegevens gaan
@@ -11,7 +11,7 @@ Deze plugin werkt uitsluitend in observe-only: hij stuurt geen apparaten aan.
    De installer installeert ontbrekende Python 3, sudo, PHP CLI, PHP curl/XML,
    CA-certificaten, curl, Docker Engine, Compose en Buildx. Bestaande Docker-installaties
    blijven behouden. De SDK zelf wordt door LoxBerry geleverd.
-2. Upload [qbrain-loxberry-0.3.3.zip](https://github.com/Q-Home/Q-Brain/raw/refs/heads/main/packages/qbrain-loxberry-0.3.3.zip)
+2. Upload [qbrain-loxberry-0.4.0.zip](https://github.com/Q-Home/Q-Brain/raw/refs/heads/main/packages/qbrain-loxberry-0.4.0.zip)
    bij LoxBerry → Pluginbeheer. Gebruik het installatiepakket, niet GitHub Download ZIP.
 3. Open Q-Brain. Eén geconfigureerde Miniserver wordt automatisch gekozen.
    Bij meerdere Miniservers kies je er één. Zonder Miniserver voeg je die eerst
@@ -53,41 +53,58 @@ controleren versieconsistentie en de metadata van het downloadpakket.
 De hostreader gebruikt `LBSystem::get_miniservers()` en `mshttp_call2()` uit de
 [LoxBerry PHP SDK](https://wiki.loxberry.de/entwickler/php_develop_plugins_with_php/php_loxberry_sdk_documentation/start).
 Hij leest `/data/LoxAPP3.json` en zoekt energierelevante namen, ook in subControls.
-De eerste reader ondersteunt **InfoOnlyAnalog** met een via HTTP leesbare scalar.
-Hij gebruikt uitsluitend `/dev/sps/io/<ontdekte UUID>/all` en de commandovrije
-getter als het SDK-patroon voor analoge nulwaarden dat vereist. Een blokantwoord
-met meerdere outputs wordt niet als scalar geïnterpreteerd.
+Vanaf 0.4.0 leest een begrensde WebSocket-sessie de numerieke state-UUIDs uit deze
+structuur. Hiervoor is Miniserver-firmware 11.2 of nieuwer vereist. De reader gebruikt
+de centrale SDK-credentials voor een kortlevend JWT met webrechten en trekt dit na
+de uitlezing zo mogelijk weer in. Er worden geen apparaatcommando's verstuurd.
+InfoOnlyAnalog zonder state-UUID behoudt de bestaande scalar-HTTP-reader.
 
-| Gegeven | Herkenning |
+| Blok | Uitlezing en analyse |
 |---|---|
-| PV-vermogen | PV/solar/zonne/photovolta in naam, expliciete W of kW |
-| Laadpaalvermogen | laadpaal/wallbox/EV in naam, expliciete W of kW |
-| Batterijlading | batterij/accu/SOC in naam, expliciet % |
-| Netvermogen | grid/netvermogen/netz met expliciet `positive import` in naam, W of kW |
-| Batterijvermogen | batterij/accu met expliciet `positive charging` in naam, W of kW |
+| Meter | Actueel vermogen via `actual`; opslaginhoud via `storage` wanneer type en eenheid bekend zijn |
+| Wallbox2 | Werkelijk laadvermogen via `actual`, afzonderlijk per laadpunt |
+| InfoOnlyAnalog | Numerieke waarde met expliciete eenheid; bestaande naamherkenning |
+| EnergyManager2 | Numerieke states worden verzameld voor de ontdekkingsanalyse |
+| Slider / TextState / InfoOnlyDigital | Metadata voor context; instellingen en online-status gelden niet als energiemeting |
 
-De formattering in Loxone bepaalt de eenheid, bijvoorbeeld `%.1f kW`.
-kW wordt naar W omgerekend. kWh, ontbrekende eenheden, ongeldige waarden en meerdere
-kandidaten worden niet stilzwijgend gebruikt. Bij net- en batterijvermogen kan
-Q-Brain de tekenrichting niet uit een losse meting afleiden; daarom is daar in deze
-MVP expliciete naamgeving nodig. Er is nog geen interactieve mapping-/richtingeditor.
+De formattering bepaalt de eenheid. kW wordt naar W omgerekend. Batterijopslag
+in kWh blijft kWh en wordt niet zonder gevalideerde capaciteit als SOC gepresenteerd.
+Meerdere laadpunten of batterijen worden afzonderlijk geanalyseerd: Q-Brain verzint
+geen totaalmeter en telt mogelijk overlappende metingen niet automatisch op.
+De vermogensrichting van een algemene Meter blijft onbekend zolang die niet expliciet
+vastligt. Voor de globale velden behoudt Q-Brain de conservatieve naamherkenning:
+PV/solar/zonne, EV/laadpaal/Wallbox2, batterij/accu/SOC met %, grid met `positive import`
+en batterijvermogen met `positive charging`. Meerdere kandidaten blijven dubbelzinnig.
 
-Native Meter, EnergyManager, Fronius, Wallbox en andere samengestelde blokken worden
-wel gevonden als hun naam energiegerelateerd is, maar **nog niet uitgelezen**.
-Hun state-UUIDs vereisen een aparte, passende reader (bijvoorbeeld WebSocket-events);
-ze worden niet blind als HTTP-ingang gebruikt. De pagina toont deze beperking.
-Automatische ontdekking is dus geen garantie dat elke bestaande installatie al
-zonder aanpassing meetgegevens oplevert. De huidige implementatie is getest met
-SDK- en Miniserverfixtures; de uitlezing op jouw concrete installatie moet nog
-worden bevestigd.
+### Lokaal ontdekkingsmodel
 
-Per cyclus zijn maximaal 100 kandidaten en 20 scalar-leespogingen toegestaan,
-met een netwerkbudget van ongeveer 20 seconden en 3 seconden per aanvraag.
-De volledige collectie draait elke circa 60–85 seconden. Meetgegevens ouder dan
-180 seconden zijn ongeldig. Ontbrekende velden blijven `null`, nooit nul.
-Zonder één bruikbaar meetpunt wordt geen energieadvies gemaakt. Bij onvolledige
-gegevens is de advieszekerheid altijd laag en wordt geen EV-vermogensadvies gegeven.
-Zonder prijzen, voorspellingen en planning worden geen optimale besparingen beloofd.
+Start maakt automatisch het Ollama-modelprofiel `qbrain-discovery:latest` aan op
+basis van het ingestelde model, standaard `qwen3:4b`. Dit is een apart profiel met
+een gerichte opdracht, geen nieuw getraind model en geen tweede kopie van de gewichten.
+Het onderzoekt namen, bloktypes, ruimtes, categorieën, eenheden, state-velden en
+beschikbare numerieke waarden. Het kan bijvoorbeeld Grid als kandidaat-netmeter en
+Battery 1–3 als afzonderlijke batterijmeters aanwijzen, en aangeven welke informatie
+nog ontbreekt. Dit werkt ook wanneer nog geen bruikbare vermogenswaarde beschikbaar is.
+
+De pagina toont voorstellen, motivatie en ontbrekende informatie. Voorstellen worden
+tegen de echte inventaris gecontroleerd; verzonnen velden en een batterij-SOC uit een
+instelslider worden geweigerd. Modelvoorstellen worden niet automatisch als mapping
+geactiveerd. De bestaande meetregels leveren wel direct bruikbare observaties per
+apparaat aan de energieanalyse. De AI kan geen verborgen of niet-geautoriseerde
+Miniservergegevens uitlezen. Er is nog geen interactieve mapping-/richtingeditor.
+
+De inventaris bevat maximaal 100 relevante blokken; de modelcontext gebruikt de
+60 eerst gerangschikte kandidaten. Ongewijzigde metadata en beschikbaarheid worden
+maximaal één uur gecachet. Nieuwe meetwaarden alleen starten geen nieuwe discovery;
+de energieanalyse gebruikt wel actuele waarden. Modelinference mag voor discovery
+maximaal 300 seconden duren, instelbaar via DISCOVERY_TIMEOUT_SECONDS.
+
+De reader begrenst HTTP tot 20 scalarpogingen en ongeveer 20 seconden, gevolgd door
+een WebSocket-budget van 18 seconden. Daarna wacht de collector 60 seconden.
+Meetgegevens ouder dan 180 seconden zijn ongeldig. Ontbrekende waarden blijven null.
+Zonder bruikbare metingen verschijnt alleen de ontdekkingsanalyse; met onvolledige
+metingen blijft energieadvies laag in zekerheid en zonder EV-vermogensadvies.
+De eerste analyse op CPU kan meerdere minuten duren.
 
 ## Architectuur en bescherming van gegevens
 
@@ -110,11 +127,12 @@ Er is geen generieke URL-, commando- of schrijffunctie voor de browser of AI.
 SDK-code draait als de LoxBerry-gebruiker, niet als root. Elke uitlezing start een
 nieuw PHP-proces en leest de centrale configuratie opnieuw. Credentials worden
 niet teruggestuurd naar Python, Docker, de browser of AI. Labels uit de installatie
-worden als tekst weergegeven; alleen numerieke telemetrie gaat naar het model.
+worden als tekst weergegeven. Begrensde metadata en numerieke telemetrie gaan naar
+het lokale model en gelden daar als onbetrouwbare invoer; credentials en JWT gaan niet mee.
 
 Vanaf 0.3.3 wordt het HTTPS-certificaat van de Miniserver niet gecontroleerd,
 zoals gevraagd voor deze lokale installatie. Dit geldt voor zowel de SDK als
-de compatibiliteitsreader. Het centraal ingestelde HTTP/HTTPS-protocol blijft behouden.
+de compatibiliteitsreader en vanaf 0.4.0 ook de WebSocket-verbinding. Het centraal ingestelde HTTP/HTTPS-protocol blijft behouden.
 Vanaf 0.3.2 ondersteunt Q-Brain ook LoxBerry 4.0.0: als `mshttp_call2` ontbreekt,
 gebruikt een beperkte PHP-curl-reader de verbinding van `LBSystem::get_miniservers()`.
 Dezelfde tijdslimieten en read-only grenzen blijven gelden.
@@ -148,6 +166,8 @@ is alleen op host-loopback bereikbaar. Ollama publiceert geen hostpoort.
   bereikbaarheid en beschikbare PHP curl/XML-modules.
 - **Meetpunten niet herkend:** open het overzicht met gevonden meetpunten. Controleer
   type, naam, eenheid en eventuele dubbele kandidaten; zie de ondersteuningstabel.
+- **WebSocket-fout:** controleer firmware (11.2+), bereikbaarheid en visualisatierechten
+  van het centraal ingestelde account. De AI kan ondertussen beschikbare metadata onderzoeken.
 - **Nog geen analyse:** wacht op de modeldownload en een volgende analysecylus.
   `qwen3:4b` draait standaard op CPU; geheugen en rekentijd hangen van de host af.
 - De native healthcheck wordt pas groen na een recente succesvolle analyse.
@@ -178,3 +198,12 @@ python scripts/build_loxberry.py
 
 Het ZIP bevat uitvoerbare LoxBerry-hooks en de samengestelde backend onder `bin/service`.
 De CI controleert Python, PHP, Bash, Docker-build en pakketopbouw.
+
+## Protocolreferenties
+
+- [Loxone communicatieprotocol](https://www.loxone.com/wp-content/uploads/datasheets/CommunicatingWithMiniserver.pdf)
+- [Loxone structuur en blokstates](https://www.loxone.com/wp-content/uploads/datasheets/StructureFile.pdf)
+
+De WebSocket-reader is getest tegen een lokale protocolfixture met TLS, SHA1/SHA256,
+fragmentatie, ping/pong en numerieke tabellen. Compatibiliteit en modelkwaliteit op
+de fysieke installatie moeten na deze update nog worden bevestigd.
