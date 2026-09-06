@@ -33,7 +33,7 @@ def test_loxberry_archive(tmp_path):
         assert {'plugin.cfg', 'preinstall.sh', 'preroot.sh', 'postroot.sh', 'daemon/daemon',
                 'uninstall/uninstall', 'webfrontend/htmlauth/index.php',
                 'templates/index.php', 'templates/help/help.html', 'icons/icon.svg',
-                'bin/healthcheck', 'bin/install.py', 'bin/control.py',
+                'bin/healthcheck', 'bin/install.py', 'bin/control.py', 'bin/dependencies.sh',
                 'bin/service/Dockerfile', 'bin/service/qbox/server.py'} <= names
         assert not any('/.env' in name or name.endswith('.env') or '__pycache__' in name for name in names)
         assert not any(name.startswith('webfrontend/html/') for name in names)

@@ -1,4 +1,4 @@
-# Q-Brain als LoxBerry-plugin (0.2.0)
+# Q-Brain als LoxBerry-plugin (0.2.1)
 
 Q-Brain heeft nu een LoxBerry 4-pluginpakket: metadata, installatie-/upgradehooks,
 een beveiligde PHP-configuratiepagina in de LoxBerry Design System-stijl,
@@ -7,17 +7,19 @@ De bestaande Python MCP/Loxone/Ollama-service blijft in Docker draaien.
 
 ## Installeren
 
-1. Gebruik **LoxBerry 4 op een 64-bit aarch64- of x86_64-host**, met Python 3.9+
-   op de host en Docker Engine plus **Compose v2** in `/usr/bin/docker`.
-   De host-Python heeft geen extra pip-pakketten nodig. De container gebruikt Python 3.12.
-   PHP en de LoxBerry PHP-libraries worden door LoxBerry geleverd.
-2. Download [qbrain-loxberry-0.2.0.zip](https://github.com/Q-Home/Q-Brain/raw/refs/heads/main/packages/qbrain-loxberry-0.2.0.zip) of bouw het zelf:
+1. Gebruik **LoxBerry 4 op een 64-bit aarch64- of x86_64-host**, gebaseerd op
+   Debian 11, 12 of 13, met werkende internettoegang en pakketbronnen.
+   De installer installeert ontbrekende hostdependencies automatisch: Python 3,
+   sudo, PHP CLI, CA-certificaten, curl, Docker Engine, Compose en Buildx.
+   De LoxBerry PHP-libraries worden door LoxBerry geleverd. Python-pakketten en
+   Ollama worden bij het starten via Docker geïnstalleerd.
+2. Download [qbrain-loxberry-0.2.1.zip](https://github.com/Q-Home/Q-Brain/raw/refs/heads/main/packages/qbrain-loxberry-0.2.1.zip) of bouw het zelf:
 
    ```sh
    python scripts/build_loxberry.py
    ```
 
-   Dit maakt `dist/qbrain-loxberry-0.2.0.zip` met `plugin.cfg` direct in de root.
+   Dit maakt `dist/qbrain-loxberry-0.2.1.zip` met `plugin.cfg` direct in de root.
    **Gebruik niet GitHub → Download ZIP**: dat is de broncode, zonder de samengestelde
    backend in `bin/service`. De preinstall-check weigert dat archief met uitleg.
    Een succesvolle GitHub Actions-run biedt hetzelfde pluginpakket als artifact aan.
@@ -31,10 +33,17 @@ De bestaande Python MCP/Loxone/Ollama-service blijft in Docker draaien.
 7. Verbind je MCP-client of laat de periodieke agent adviseren. Daarna kun je
    echte Loxone-credentials en de vijf signaalnamen instellen, opslaan en toepassen.
 
-Docker zelf wordt niet door deze plugin geïnstalleerd en de webgebruiker wordt niet
-aan de Docker-groep toegevoegd. Een ontbrekende Docker-installatie verschijnt in de UI.
-Zie de [officiële Docker-installatiehandleiding](https://docs.docker.com/engine/install/debian/)
-voor de passende Debian-host. Een LoxBerry die zelf in Docker draait wordt door deze
+De dependencyinstallatie gebeurt in de root-installatiehook, vóór de Python-check.
+Een nieuwe Docker-installatie gebruikt de [officiële Docker-pakketbron](https://docs.docker.com/engine/install/debian/)
+met een afzonderlijke signing key. Een bestaande Docker-installatie wordt behouden;
+ontbrekende Compose-/Buildx-pakketten worden uit de passende pakketbron toegevoegd.
+De installer verwijdert geen conflicterende runtimes of bestaande containers en
+herstart geen actieve Docker-daemon. Bij pakketconflicten, een niet ondersteunde
+Debian-versie of downloadfouten stopt de installatie met uitleg in de installatielog.
+APT wacht tot vijf minuten op een pakketlock. Docker wordt voor boot ingeschakeld
+en gestart als hij nog niet draait; daarna wordt de daemon gecontroleerd.
+De webgebruiker wordt niet aan de Docker-groep toegevoegd.
+Een LoxBerry die zelf in Docker draait wordt door deze
 versie niet ondersteund: er is geen Docker-in-Docker- of socket-sharingconfiguratie.
 
 De standaard Ollama draait lokaal op CPU. Kies een model dat in het geheugen van
@@ -124,6 +133,16 @@ Docker-data-volumes blijven behouden voor herstel. Neem eerst een back-up; verwi
 retained data daarna alleen bewust als je Q-Brain definitief wilt wissen. Een
 vastgelopen Docker-daemon of lopende beheerbewerking kan opruimen verhinderen;
 de uninstaller breekt dan af zodat je de plugin kunt behouden en opnieuw proberen.
+
+Gedeelde hostdependencies (zoals Docker), de Docker-pakketbron en signing key
+blijven bij uninstall aanwezig, omdat andere software die kan gebruiken.
+
+### Upgraden vanaf 0.2.0 zonder Docker
+
+Upload het nieuwe **0.2.1-ZIP** gewoon via Pluginbeheer. De nieuwe root-hook
+installeert eerst Docker en de overige ontbrekende dependencies; instellingen en
+token van 0.2.0 blijven behouden. Open daarna Q-Brain, start de services en download
+het model. Je hoeft Docker niet meer vooraf handmatig te installeren.
 
 ## MCP verbinden en diagnose
 

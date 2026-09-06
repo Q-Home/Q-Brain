@@ -1,8 +1,11 @@
-# Validatie van Q-Brain 0.2.0
+# Validatie van Q-Brain 0.2.1
 
 Uitgevoerd op 6 september 2026 met Python 3.12 op Windows:
 
-- **47 tests geslaagd, 1 Linux-specifieke test overgeslagen**: `python -m pytest tests -q`.
+- **53 tests geslaagd, 2 Linux-specifieke tests overgeslagen**: `python -m pytest tests -q`.
+- Dependencybootstrap getest met gesimuleerde hostcommando's: verse installatie,
+  bestaande Docker, ontbrekende Compose, pakketconflicten, APT-fouten en onbekende Debian-versie.
+  De repository-/signing-keytest en proceslocking draaien daarnaast op Linux CI.
 - PHP 8.4: beide PHP-bestanden zonder syntaxfouten; echte HTTP-tests van formulier,
   sessiecookie en CSRF-blokkade met gestubde LoxBerry-libraries.
 - Bash-syntax van installatie-, upgrade-, boot- en uninstall-hooks gecontroleerd.
@@ -22,9 +25,13 @@ Niet uitgevoerd in deze omgeving:
 - Docker image bouwen/starten: Docker is niet geïnstalleerd.
 - Echte Ollama-modelinference en prestaties op Q-Box-hardware.
 - Aanroepen naar een fysieke Loxone Miniserver, laadpaal of installatie.
-- Een echte LoxBerry-installatie, upgrade, reboot en uninstall.
+- Dependencyinstallatie van 0.2.1 op echte LoxBerry-hardware en upgrade/reboot/uninstall.
 - Linux-proceslocking wordt door de meegeleverde GitHub Actions-workflow getest.
 
 Voor ingebruikname: voer de README-startprocedure op de Q-Box uit, controleer
 `/readyz`, vergelijk demo/real snapshots en adviezen, en valideer de Loxone-mappings
 in observe-only. De LoxBerry-variant ondersteunt uitsluitend observe-only.
+
+De aangeleverde installatielog bevestigt dat 0.2.0 succesvol geïnstalleerd werd op
+LoxBerry 4.0.0.15 / aarch64 NanoPi R5S/R5C. De ontbrekende Docker-installatie uit
+die log is de aanleiding voor de dependencybootstrap in 0.2.1.

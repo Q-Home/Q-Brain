@@ -19,7 +19,7 @@ jobs:
         run: |
           php -l webfrontend/htmlauth/index.php
           php -l templates/index.php
-          bash -n preinstall.sh preroot.sh postroot.sh daemon/daemon uninstall/uninstall
+          bash -n preinstall.sh preroot.sh postroot.sh bin/dependencies.sh daemon/daemon uninstall/uninstall
       - name: Build Docker service
         run: docker build -t qbrain-ci .
       - name: Build LoxBerry plugin

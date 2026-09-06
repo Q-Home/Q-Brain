@@ -5,6 +5,8 @@ if [ ! -f "${6:?Missing package path}/bin/service/Dockerfile" ]; then
   echo '<ERROR> Use the built Q-Brain LoxBerry ZIP.'
   exit 2
 fi
+# Install prerequisites before preinstall's Python check and before stopping an old runtime.
+/bin/bash "${6}/bin/dependencies.sh" || { echo '<ERROR> Q-Brain dependencies are not ready.'; exit 2; }
 folder="${3:?Missing plugin folder}"
 case "$folder" in ''|*[!a-zA-Z0-9_-]*) exit 2 ;; esac
 controller="/usr/local/lib/qbrain/$folder/control.py"

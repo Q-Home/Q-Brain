@@ -1,4 +1,4 @@
-"""Root installation hook. No Docker installation, model pull or start on install."""
+"""Root installation hook; host dependencies are prepared by preroot.sh."""
 import argparse
 import json
 import os
@@ -51,8 +51,6 @@ def main():
     os.chmod(health, 0o755)
     print('<OK> Q-Brain installed. Existing settings and data have been preserved.')
     print('<INFO> Open Q-Brain, save settings, then start the services and download the model.')
-    if not shutil.which('docker'):
-        print('<WARNING> Docker is not installed. Install Docker Engine and Compose v2 on this host first.')
     restored = subprocess.run([str(target / 'control.py'), 'boot'], capture_output=True)
     if restored.returncode:
         print('<WARNING> Automatic service restore failed. Use Start on the plugin page after checking Docker.')

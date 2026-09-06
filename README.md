@@ -1,12 +1,16 @@
 # Q-Brain — LoxBerry-plugin en lokale energie-assistent
 
 Lokale energie-observatie en AI-advies via **MCP → Loxone** en **Ollama**.
-Versie 0.2.0 voegt een **LoxBerry 4-plugin** toe met een native configuratiepagina,
+Versie 0.2.1 voegt een **LoxBerry 4-plugin** toe met een native configuratiepagina,
 servicebeheer, installatie-/upgradehooks en een bouwbaar plugin-ZIP. De bestaande
 Docker-service blijft ook zelfstandig bruikbaar.
 
+Vanaf 0.2.1 installeert het LoxBerry-pakket ook ontbrekende hostdependencies,
+waaronder Docker Engine, Compose en Buildx. Upload het nieuwe ZIP als upgrade
+wanneer je 0.2.0 al hebt geïnstalleerd.
+
 **LoxBerry installeren:** volg [de LoxBerry-handleiding](docs/LOXBERRY.md).
-Download [het installatie-ZIP](https://github.com/Q-Home/Q-Brain/raw/refs/heads/main/packages/qbrain-loxberry-0.2.0.zip).
+Download [het installatie-ZIP](https://github.com/Q-Home/Q-Brain/raw/refs/heads/main/packages/qbrain-loxberry-0.2.1.zip).
 Bouw het installatiepakket met `python scripts/build_loxberry.py`. Gebruik het
 gegenereerde ZIP onder `dist/`, niet het GitHub-broncodearchief.
 
