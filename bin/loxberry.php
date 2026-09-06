@@ -3,6 +3,49 @@
 declare(strict_types=1);
 if (PHP_SAPI !== 'cli') { http_response_code(404); exit; }
 ini_set('display_errors', '0');
+// Compatibility reader for LoxBerry 4.0.0, whose PHP SDK has no mshttp_call2.
+// Connection data still comes exclusively from LBSystem::get_miniservers().
+class QBrainReadError extends RuntimeException {
+    public string $reason;
+    public function __construct(string $reason) { $this->reason = $reason; parent::__construct('Q-Brain read failed'); }
+}
+function qbrain_http_read(array $server, string $path): array {
+    if (!preg_match('~^/(?:data/LoxAPP3\.json|dev/sps/io/[a-f0-9-]{32,36}(?:/all)?)$~iD', $path)) {
+        throw new QBrainReadError('sdk_unavailable');
+    }
+    if (!function_exists('curl_init')) { throw new QBrainReadError('php_curl_missing'); }
+    $origin = (string)($server['FullURI'] ?? '');
+    if (!preg_match('~^https?://~D', $origin)) { throw new QBrainReadError('connection'); }
+    $body = ''; $large = false;
+    $curl = curl_init($origin . $path);
+    curl_setopt_array($curl, [CURLOPT_HEADER => false, CURLOPT_FOLLOWLOCATION => false,
+        CURLOPT_CONNECTTIMEOUT => 3, CURLOPT_TIMEOUT => 3,
+        CURLOPT_PROTOCOLS => CURLPROTO_HTTP | CURLPROTO_HTTPS,
+        CURLOPT_SSL_VERIFYPEER => true, CURLOPT_SSL_VERIFYHOST => 2,
+        CURLOPT_WRITEFUNCTION => function($handle, string $chunk) use (&$body, &$large): int {
+            if (strlen($body) + strlen($chunk) > 8388608) { $large = true; return 0; }
+            $body .= $chunk; return strlen($chunk);
+        }]);
+    $ok = curl_exec($curl);
+    $code = (int)curl_getinfo($curl, CURLINFO_RESPONSE_CODE);
+    $errno = curl_errno($curl);
+    curl_close($curl);
+    return [$body, ['code' => $code, 'error' => $ok === false ? 1 : 0,
+                   'errno' => $errno, 'large' => $large]];
+}
+function qbrain_check_response($body, array $info): string {
+    $code = (int)($info['code'] ?? 0);
+    $errno = (int)($info['errno'] ?? 0);
+    if (!empty($info['large']) || (is_string($body) && strlen($body) > 8388608)) { throw new QBrainReadError('response_large'); }
+    if (in_array($code, [401,403], true)) { throw new QBrainReadError('authentication'); }
+    // Native SDK lacks a curl errno field; classify its status without exposing raw text.
+    $status = (string)($info['status'] ?? '');
+    if (in_array($errno, [51,58,60,77,83,90,91], true) || preg_match('/certificate|SSL peer/i', $status)) { throw new QBrainReadError('certificate'); }
+    if ($errno === 28 || preg_match('/timed? ?out|timeout/i', $status)) { throw new QBrainReadError('timeout'); }
+    if ($code === 0 || $errno !== 0) { throw new QBrainReadError('connection'); }
+    if ($code !== 200 || !empty($info['error']) || !is_string($body)) { throw new QBrainReadError('http_error'); }
+    return $body;
+}
 ob_start();
 try {
     $installation = json_decode(file_get_contents(__DIR__ . '/installation.json'), true, 16, JSON_THROW_ON_ERROR);
@@ -20,17 +63,23 @@ try {
     if (($argv[1] ?? '') === 'collect') {
         $id = $argv[2] ?? '';
         if ($id === '' && count($list) === 1) { $id = $list[0]['id']; }
-        if (!isset($servers[$id])) { throw new RuntimeException('Selecteer een Miniserver uit LoxBerry.'); }
+        if ($id === '' && count($list) > 1) { throw new QBrainReadError('selection_required'); }
+        if (!isset($servers[$id])) { throw new QBrainReadError('miniserver_missing'); }
+        if (!function_exists('simplexml_load_string')) { throw new QBrainReadError('php_xml_missing'); }
         $deadline = microtime(true) + 20;
-        $read = function(string $path) use ($id, $deadline): string {
-            if (microtime(true) >= $deadline) { throw new RuntimeException('Leestijd verstreken.'); }
-            [$body, $info] = mshttp_call2($id, $path, ['timeout' => 3, 'ssl_verify_mode' => 1, 'ssl_verify_hostname' => 1]);
-            if (($info['error'] ?? 1) || ($info['code'] ?? 0) !== 200 || !is_string($body) || strlen($body) > 8388608) {
-                throw new RuntimeException('Miniserver niet leesbaar. Controleer bereikbaarheid, certificaat en LoxBerry-accountrechten.');
+        $read = function(string $path) use ($id, $deadline, $servers): string {
+            if (microtime(true) >= $deadline) { throw new QBrainReadError('timeout'); }
+            if (function_exists('mshttp_call2')) {
+                [$body, $info] = mshttp_call2($id, $path, ['timeout' => 3, 'ssl_verify_mode' => 1, 'ssl_verify_hostname' => 1]);
+            } else {
+                [$body, $info] = qbrain_http_read($servers[$id], $path);
             }
-            return $body;
+            return qbrain_check_response($body, $info);
         };
-        $structure = json_decode($read('/data/LoxAPP3.json'), true, 64, JSON_THROW_ON_ERROR);
+        $rawStructure = $read('/data/LoxAPP3.json');
+        try { $structure = json_decode($rawStructure, true, 64, JSON_THROW_ON_ERROR); }
+        catch (JsonException $e) { throw new QBrainReadError('structure_invalid'); }
+        if (!is_array($structure) || !is_array($structure['controls'] ?? null)) { throw new QBrainReadError('structure_invalid'); }
         $controls = $structure['controls'] ?? [];
         $candidates = [];
         $scan = function(array $items, int $depth = 0) use (&$scan, &$candidates): void {
@@ -87,6 +136,6 @@ try {
     echo json_encode($result, JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE);
 } catch (Throwable $e) {
     ob_end_clean();
-    echo json_encode(['error' => 'LoxBerry SDK: geen gegevens beschikbaar. Controleer Miniserverselectie, rechten, verbinding en certificaat.']);
+    echo json_encode(['error' => 'SDK read failed', 'error_code' => $e instanceof QBrainReadError ? $e->reason : 'sdk_unavailable']);
     exit(1);
 }

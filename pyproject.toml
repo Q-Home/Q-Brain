@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "qbox-energy"
-version = "0.3.1"
+version = "0.3.2"
 description = "Local Q-Box energy MCP bridge and Ollama advisor"
 requires-python = ">=3.11"
 dependencies = ["mcp>=1.26,<2", "httpx>=0.28,<0.29", "pydantic-settings>=2.7,<3", "uvicorn>=0.34,<1", "defusedxml>=0.7,<1"]

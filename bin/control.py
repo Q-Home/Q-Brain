@@ -92,8 +92,8 @@ def compose_document(settings, runtime, folder):
     env.update(MCP_TOKEN=settings['mcp_token'], OBSERVE_ONLY='true', ENABLE_EV_WRITE='false',
                OLLAMA_URL='http://ollama:11434', HISTORY_PATH='/data/history.sqlite3')
     env = {k: v.replace('$', '$$') for k, v in env.items()}
-    common = {'image': 'qbrain-' + folder + ':0.3.1', 'environment': env,
-              'read_only': True, 'tmpfs': ['/tmp'], 'cap_drop': ['ALL'],
+    common = {'image': 'qbrain-' + folder + ':0.3.2', 'environment': env,
+              'pull_policy': 'never', 'read_only': True, 'tmpfs': ['/tmp'], 'cap_drop': ['ALL'],
               'security_opt': ['no-new-privileges:true'], 'restart': 'unless-stopped',
               'logging': {'driver': 'json-file', 'options': {'max-size': '10m', 'max-file': '3'}}}
     return {'services': {
@@ -173,14 +173,29 @@ class Controller:
         result = subprocess.run(['/usr/bin/sudo', '-u', 'loxberry', '/usr/bin/php',
                                  str(self.runtime / 'loxberry.php'), action, selected],
                                 capture_output=True, timeout=30, env={**self.process_env(), 'LBHOMEDIR': home})
-        if result.returncode or len(result.stdout) > 1048576:
-            raise ControlError('LoxBerry SDK niet beschikbaar. Controleer Miniserver en SDK-dependencies.')
+        if len(result.stdout) > 1048576:
+            raise ControlError('SDK-antwoord is te groot.')
         try:
             data = json.loads(result.stdout)
         except ValueError:
-            raise ControlError('LoxBerry SDK gaf geen geldig antwoord') from None
-        if data.get('error'):
-            raise ControlError('LoxBerry SDK: controleer Miniserver, rechten, verbinding en certificaat.')
+            raise ControlError('SDK-reader gaf geen geldig antwoord. Controleer PHP en de plugininstallatie.') from None
+        if result.returncode or data.get('error'):
+            messages = {
+                'selection_required': 'Kies een Miniserver op de Q-Brain-pagina.',
+                'miniserver_missing': 'De gekozen Miniserver ontbreekt in LoxBerry.',
+                'php_curl_missing': 'PHP curl ontbreekt. Installeer de plugin-update opnieuw.',
+                'php_xml_missing': 'PHP XML ontbreekt. Installeer de plugin-update opnieuw.',
+                'authentication': 'Miniserver weigert de aanmelding (HTTP 401/403). Controleer het centrale LoxBerry-account en de rechten.',
+                'certificate': 'Het HTTPS-certificaat van de Miniserver wordt niet vertrouwd. Controleer het certificaat op de LoxBerry-host.',
+                'timeout': 'De Miniserver antwoordt niet binnen de leestijd. Controleer de verbinding.',
+                'connection': 'Geen verbinding met de Miniserver. Controleer adres, poort en bereikbaarheid in LoxBerry.',
+                'structure_invalid': 'De Miniserver levert geen geldige LoxAPP3.json-structuur.',
+                'http_error': 'De Miniserver retourneert een HTTP-fout bij het lezen van de configuratie.',
+                'response_large': 'De Miniserver-respons overschrijdt de toegestane grootte.',
+                'sdk_unavailable': 'LoxBerry SDK kon niet worden geladen. Controleer de plugininstallatie.',
+            }
+            code = data.get('error_code', 'sdk_unavailable')
+            raise ControlError(messages.get(code, messages['sdk_unavailable']))
         return data
 
     def start_collector(self):
@@ -207,8 +222,10 @@ class Controller:
                 return
             try:
                 data = self.sdk('collect', read_json(self.state / 'collector.json', {})['miniserver_id'])
+            except ControlError as error:
+                data = {'timestamp': time.time(), 'error': str(error)}
             except Exception:
-                data = {'timestamp': time.time(), 'error': 'SDK-uitlezing mislukt; controleer Miniserverselectie, rechten, verbinding en certificaat.'}
+                data = {'timestamp': time.time(), 'error': 'SDK-reader niet beschikbaar of leestijd verstreken. Controleer de plugininstallatie.'}
             if read_json(self.state / 'collector.json', {}).get('generation') != generation:
                 return
             destination = self.state / 'telemetry/snapshot.json'
@@ -278,7 +295,8 @@ class Controller:
                 atomic_json(self.state / 'collector.json', {})
                 if self.settings()['loxberry_sdk'] and not self.settings()['demo_mode']:
                     self.start_collector()
-                self.run('up', '-d', '--build', 'qbox', 'ollama', 'agent')
+                self.run('build', 'qbox')
+                self.run('up', '-d', '--no-build', 'qbox', 'ollama', 'agent')
                 self.ensure_model()
                 atomic_json(self.state / 'applied.json', {'revision': self.settings()['revision']})
             elif action == 'stop':

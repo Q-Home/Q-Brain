@@ -1,5 +1,12 @@
 # Wijzigingen
 
+## 0.3.2
+
+- Ondersteuning voor de PHP SDK van LoxBerry 4.0.0 zonder mshttp_call2.
+- Specifieke, geschoonde foutmeldingen voor verbinding, certificaat, rechten en configuratie.
+- Eerst het lokale image bouwen; Q-Brain en agent proberen dat image niet meer te downloaden.
+- Docker CI start nu beide services na de build, zonder Ollama-modeldownload.
+
 ## 0.3.1
 
 - Native LoxBerry-updates ingeschakeld via de stabiele release.cfg-updatebron.

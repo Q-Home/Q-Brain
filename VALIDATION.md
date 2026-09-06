@@ -1,3 +1,16 @@
+# Validatie van Q-Brain 0.3.2
+
+77 tests geslaagd, 2 Linux-specifieke tests overgeslagen op Windows.
+Nieuw: echte HTTP-uitlezing met een oudere SDK zonder mshttp_call2, HTTP 401 en
+redirectweigering, geschoonde foutmeldingen en build-volgorde/pullbeleid.
+De CI bouwt en start nu Q-Brain plus agent met het lokale image.
+De fix is nog niet op de fysieke Miniserver van de gebruiker getest.
+
+De aangeleverde startlog toont een pullpoging voor het lokale Q-Brain-image en
+nog lopende Ollama-imagedownload. De SDK mshttp_call2 werd volgens de officiële
+LoxBerry-commit e87dbbedffaba928d8a4de88a48efa30e35803d1 pas voor 4.0.1 toegevoegd;
+4.0.0.15 heeft deze functie niet. Dit is een compatibiliteitsfout in Q-Brain 0.3.0/0.3.1.
+
 # Validatie van Q-Brain 0.3.1
 
 66 tests geslaagd, 2 Linux-specifieke tests overgeslagen op Windows.

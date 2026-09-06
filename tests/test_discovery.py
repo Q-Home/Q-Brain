@@ -72,13 +72,14 @@ def sdk(tmp_path):
     (tmp_path / 'installation.json').write_text(json.dumps({'home': str(tmp_path)}))
     (libs / 'loxberry_system.php').write_text('''<?php
 class LBSystem { static function get_miniservers() {
-$servers = ['1' => ['Name'=>'Home', 'Admin'=>'hidden-user', 'Pass'=>'hidden-password']];
+$servers = ['1' => ['Name'=>'Home', 'Admin'=>'hidden-user', 'Pass'=>'hidden-password', 'FullURI'=>getenv('SDK_ORIGIN')]];
 if (getenv('SDK_MULTI')) $servers['2'] = ['Name'=>'Office'];
 return $servers;
 } }
 ''')
     (libs / 'loxberry_io.php').write_text('''<?php
 function mshttp_call2($id, $path, $options) {
+if (getenv('SDK_CODE') !== false) return [null, ['code'=>(int)getenv('SDK_CODE'), 'error'=>1, 'status'=>getenv('SDK_STATUS')]];
 file_put_contents(getenv('SDK_TRACE'), json_encode([$id, $path, $options])."\\n", FILE_APPEND);
 if ($path === '/data/LoxAPP3.json') return [json_encode(['controls'=>[
 '12345678-1234-1234-1234567890123456'=>['name'=>'PV vermogen','type'=>'InfoOnlyAnalog','details'=>['format'=>'%.2f kW']],
@@ -92,9 +93,11 @@ return ['<LL Code="200" value="0"/>', ['code'=>200,'error'=>0]];
     def run(action='collect', selected='', **env):
         trace = tmp_path / 'trace.jsonl'
         trace.write_text('')
-        result = subprocess.run([PHP, str(tmp_path / 'loxberry.php'), action, selected],
+        options = ['-d', 'extension_dir=' + str(Path(PHP).parent / 'ext'), '-d', 'extension=curl'] if os.name == 'nt' else []
+        result = subprocess.run([PHP, *options, str(tmp_path / 'loxberry.php'), action, selected],
                                 env={**os.environ, 'SDK_TRACE': str(trace), **env}, capture_output=True, text=True, timeout=5)
         return result, [json.loads(line) for line in trace.read_text().splitlines()]
+    run.root = tmp_path
     return run
 
 
@@ -124,3 +127,54 @@ def test_sdk_multiple_servers_require_selection_and_reject_block_response(sdk):
     assert json.loads(result.stdout)['readings'][0]['value'] is None
     result, calls = sdk(selected='../On')
     assert result.returncode == 1 and not calls
+
+
+@pytest.mark.parametrize('code,status,expected', [
+    ('401', 'hidden-password', 'authentication'),
+    ('403', 'private-url', 'authentication'),
+    ('0', 'SSL certificate problem: hidden-password', 'certificate'),
+    ('0', 'Operation timed out: hidden-password', 'timeout'),
+    ('0', 'Could not connect: hidden-password', 'connection'),
+    ('500', 'hidden-password', 'http_error'),
+])
+def test_sdk_errors_are_specific_and_never_expose_raw_response(sdk, code, status, expected):
+    result, _ = sdk(SDK_CODE=code, SDK_STATUS=status)
+    assert result.returncode == 1
+    assert json.loads(result.stdout)['error_code'] == expected
+    assert 'hidden-password' not in result.stdout and 'private-url' not in result.stdout
+
+
+@pytest.mark.parametrize('status', [200, 401, 302])
+def test_loxberry_400_compatibility_reads_through_real_http(sdk, status):
+    import threading
+    from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+    # Older SDK really has NO mshttp_call2. Keep the real Q-Brain curl transport.
+    (sdk.root / 'libs/phplib/loxberry_io.php').write_text('<?php')
+    requests = []
+    class Server(BaseHTTPRequestHandler):
+        def log_message(self, *args): pass
+        def do_GET(self):
+            requests.append((self.path, self.headers.get('Authorization')))
+            self.send_response(status)
+            if status == 302: self.send_header('Location', '/must-not-follow')
+            self.end_headers()
+            if self.path == '/data/LoxAPP3.json':
+                self.wfile.write(json.dumps({'controls': {UUID: {'name':'PV vermogen', 'type':'InfoOnlyAnalog', 'details':{'format':'%.1f kW'}}}}).encode())
+            else:
+                self.wfile.write(b'<LL Code="200" value="3.2"/>')
+    server = ThreadingHTTPServer(('127.0.0.1', 0), Server)
+    thread = threading.Thread(target=server.serve_forever, daemon=True); thread.start()
+    try:
+        result, _ = sdk(SDK_ORIGIN=f'http://hidden-user:hidden-password@127.0.0.1:{server.server_port}')
+        assert 'hidden-password' not in result.stdout
+        if status == 200:
+            assert result.returncode == 0, result.stdout + result.stderr
+            assert json.loads(result.stdout)['readings'][0]['value'] == 3.2
+            assert [x[0] for x in requests] == ['/data/LoxAPP3.json', f'/dev/sps/io/{UUID}/all']
+            assert all(x[1] is not None for x in requests)
+        else:
+            assert result.returncode == 1
+            assert json.loads(result.stdout)['error_code'] == ('authentication' if status == 401 else 'http_error')
+            assert len(requests) == 1
+    finally:
+        server.shutdown(); server.server_close(); thread.join(timeout=3)

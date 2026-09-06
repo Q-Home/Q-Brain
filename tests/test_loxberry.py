@@ -254,3 +254,26 @@ def test_release_feed_matches_installable_archive():
         assert bundled['AUTOUPDATE'] == metadata['AUTOUPDATE']
         assert 'bin/service/qbox/server.py' in archive.namelist()
     assert release['INFOURL'] == 'https://github.com/Q-Home/Q-Brain/blob/main/docs/CHANGELOG.md'
+
+
+def test_local_image_is_built_before_start_and_never_pulled(controller, monkeypatch):
+    compose = control.compose_document(settings(), controller.runtime, controller.folder)
+    assert compose['services']['qbox']['pull_policy'] == 'never'
+    assert compose['services']['agent']['pull_policy'] == 'never'
+    assert compose['services']['ollama'].get('pull_policy') != 'never'
+    controller.run = Mock(); controller.ensure_model = Mock()
+    monkeypatch.setattr(control.os, 'fstat', lambda fd: None)
+    monkeypatch.setattr(control.os, 'close', lambda fd: None)
+    controller.worker('start', 123)
+    assert controller.run.call_args_list[0].args == ('build', 'qbox')
+    assert controller.run.call_args_list[1].args == ('up', '-d', '--no-build', 'qbox', 'ollama', 'agent')
+
+
+def test_sdk_failure_is_preserved_without_stderr_or_raw_error(controller, monkeypatch):
+    controller.runtime.mkdir()
+    control.atomic_json(controller.runtime / 'installation.json', {'home': '/opt/loxberry'})
+    monkeypatch.setattr(control.subprocess, 'run', Mock(return_value=Mock(returncode=1,
+        stdout=b'{"error":"secret-password", "error_code":"authentication"}', stderr=b'secret-password')))
+    with pytest.raises(control.ControlError, match='401/403') as failure:
+        controller.sdk('collect', '1')
+    assert 'secret-password' not in str(failure.value)

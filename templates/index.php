@@ -90,7 +90,7 @@
     fields.disabled = !configured || data.job.status === 'running';
     document.getElementById('stop').disabled = data.job.status === 'running';
     const discovery = data.overview?.discovery || {};
-    text('discovery-status', discovery.error || data.sdk?.error || (data.demo_mode ? 'Fictieve demowaarden.' : 'Ontbrekende of dubbelzinnige meetpunten blijven onbekend. Vermogensrichting moet expliciet bekend zijn.'));
+    text('discovery-status', data.sdk?.error || discovery.error || (data.demo_mode ? 'Fictieve demowaarden.' : 'Ontbrekende of dubbelzinnige meetpunten blijven onbekend. Vermogensrichting moet expliciet bekend zijn.'));
     const labels = {grid_power: 'Netvermogen', pv_power: 'Zonnepanelen', battery_soc: 'Batterijlading', battery_power: 'Batterijvermogen', ev_power: 'Laadpaal'};
     const states = {found: 'gevonden', missing: 'niet herkend', ambiguous: 'meerdere kandidaten', invalid: 'ongeldige waarde'};
     list('signals', Object.entries(discovery.signals || {}).map(([key, value]) => labels[key] + ': ' + (states[value.status] || value.status)));

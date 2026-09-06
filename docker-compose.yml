@@ -2,7 +2,8 @@ name: qbox-energy
 services:
   qbox:
     build: .
-    image: qbox-energy:0.3.0
+    image: qbox-energy:0.3.2
+    pull_policy: never
     env_file: .env
     ports:
       - "127.0.0.1:8080:8080"
@@ -17,7 +18,8 @@ services:
       driver: json-file
       options: {max-size: "10m", max-file: "3"}
   agent:
-    image: qbox-energy:0.3.0
+    image: qbox-energy:0.3.2
+    pull_policy: never
     env_file: .env
     environment:
       MCP_URL: http://qbox:8080/mcp

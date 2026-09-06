@@ -23,8 +23,8 @@ jobs:
           for script in preinstall.sh preroot.sh postroot.sh bin/dependencies.sh daemon/daemon uninstall/uninstall; do
             bash -n "$script"
           done
-      - name: Build Docker service
-        run: docker build -t qbrain-ci .
+      - name: Build and start local Docker services
+        run: python scripts/check_compose_start.py
       - name: Build LoxBerry plugin
         run: python scripts/build_loxberry.py
       - uses: actions/upload-artifact@v4
