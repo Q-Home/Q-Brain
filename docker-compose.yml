@@ -1,0 +1,46 @@
+name: qbox-energy
+services:
+  qbox:
+    build: .
+    image: qbox-energy:0.1.0
+    env_file: .env
+    ports:
+      - "127.0.0.1:8080:8080"
+    volumes:
+      - history:/data
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options: {max-size: "10m", max-file: "3"}
+  agent:
+    image: qbox-energy:0.1.0
+    env_file: .env
+    environment:
+      MCP_URL: http://qbox:8080/mcp
+    command: [python, -m, qbox.agent]
+    depends_on:
+      qbox: {condition: service_healthy}
+    healthcheck: {disable: true}
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options: {max-size: "10m", max-file: "3"}
+  ollama:
+    image: ollama/ollama:0.11.10
+    volumes:
+      - ollama:/root/.ollama
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options: {max-size: "10m", max-file: "3"}
+volumes:
+  history:
+  ollama:
