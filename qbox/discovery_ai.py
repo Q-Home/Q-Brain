@@ -17,7 +17,7 @@ class SignalProposal(BaseModel):
 class DiscoveryAnalysis(BaseModel):
     model_config = ConfigDict(extra='forbid')
     summary: str = Field(min_length=1, max_length=2000)
-    proposals: list[SignalProposal] = Field(max_length=8)
+    proposals: list[SignalProposal] = Field(max_length=4)
     missing_information: list[str] = Field(max_length=10)
 
 
@@ -29,7 +29,7 @@ Wallbox2.limit and Slider.position are SETTINGS, not measured power or battery S
 Multiple meters/chargers must remain individually identified. Do not sum nested/shared meters or average battery SOC without topology/capacity.
 Propose likely semantic roles and explain missing data and uncertainty, especially grid/battery polarity. These are proposals only.
 EnergyManager2 has fixed units: Gpwr grid kW positive import, Ppwr production kW, Spwr storage kW NEGATIVE charging, Ssoc charge percent. HasSsoc/HasSpwr false means unavailable. Never reinterpret these roles.
-Return at most 8 priority proposals with short reasons.
+Return at most 4 priority proposals with short reasons. The inventory may be a subset; absence is not proof a device does not exist.
 Report discovery even when no live values are available. Output JSON matching the schema.'''
 
 

@@ -1,4 +1,4 @@
-# Q-Brain voor LoxBerry 4 — versie 0.4.1
+# Q-Brain voor LoxBerry 4 — versie 0.4.2
 
 Q-Brain gebruikt de Miniserver die al in LoxBerry is ingesteld. De lokale
 LoxBerry PHP SDK leest de verbinding en meetwaarden; alleen meetgegevens gaan
@@ -11,7 +11,7 @@ Deze plugin werkt uitsluitend in observe-only: hij stuurt geen apparaten aan.
    De installer installeert ontbrekende Python 3, sudo, PHP CLI, PHP curl/XML,
    CA-certificaten, curl, Docker Engine, Compose en Buildx. Bestaande Docker-installaties
    blijven behouden. De SDK zelf wordt door LoxBerry geleverd.
-2. Upload [qbrain-loxberry-0.4.1.zip](https://github.com/Q-Home/Q-Brain/raw/refs/heads/main/packages/qbrain-loxberry-0.4.1.zip)
+2. Upload [qbrain-loxberry-0.4.2.zip](https://github.com/Q-Home/Q-Brain/raw/refs/heads/main/packages/qbrain-loxberry-0.4.2.zip)
    bij LoxBerry → Pluginbeheer. Gebruik het installatiepakket, niet GitHub Download ZIP.
 3. Open Q-Brain. Eén geconfigureerde Miniserver wordt automatisch gekozen.
    Bij meerdere Miniservers kies je er één. Zonder Miniserver voeg je die eerst
@@ -227,3 +227,21 @@ de pagina nu timeout, onbereikbare Ollama, HTTP-status of ongeldig modelantwoord
 zonder ruwe prompts of secrets te tonen. Een geslaagde modelinstallatie bewijst niet
 dat inference op de host binnen de tijdslimiet lukt. De aangeleverde 0.4.0-log bevestigt
 modelcreatie en telemetrie, maar bevat geen oorzaak van de mislukte AI-aanroep.
+
+## Compacte hosts: 0.4.2
+
+Op een NanoPi R5C is qwen3:4b een zware keuze naast LoxBerry. Probeer onder
+Geavanceerd het model qwen3:0.6b en klik Start en analyseer automatisch. Het
+ontdekkingsprofiel wordt dan opnieuw opgebouwd uit dit kleinere model. Bestaande
+modelbestanden blijven behouden. Ook dit kleinere model moet op de echte host
+worden gevalideerd; vooral bij weinig RAM is succes niet gegarandeerd.
+
+De LoxBerry-service houdt maximaal één Ollama-model tegelijk geladen en verwerkt
+één aanvraag tegelijk. Beide analysepaden gebruiken een context van 4096 tokens;
+de ontdekkingscontext bevat maximaal 6000 JSON-tekens en maximaal vier voorstellen.
+EnergyManager2 krijgt voorrang. De volledige inventaris blijft in de pagina staan;
+de modelselectie is een subset en kan dus gegevens missen. De energietimeout is
+voor LoxBerry verhoogd naar 300 seconden. Herkende geheugen- en runnerfouten worden
+als vaste geschoonde meldingen getoond. Andere HTTP 500-fouten blijven ongespecificeerd.
+
+Zie [Ollama geheugen en gelijktijdige modellen](https://docs.ollama.com/faq).

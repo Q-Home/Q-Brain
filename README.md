@@ -1,7 +1,7 @@
 # Q-Brain — LoxBerry-plugin en lokale energie-assistent
 
 Lokale energie-observatie en AI-advies via **MCP → Loxone** en **Ollama**.
-Versie 0.4.1 hergebruikt de Miniserver via de LoxBerry PHP SDK, zoekt automatisch
+Versie 0.4.2 hergebruikt de Miniserver via de LoxBerry PHP SDK, zoekt automatisch
 naar ondersteunde energiemeetpunten en toont lokale analyses. Eén startknop regelt
 services en modeldownload. Credentials blijven op de LoxBerry-host. Niet ondersteunde
 blokken en dubbelzinnige meetpunten worden expliciet gemeld; zie de handleiding.
@@ -28,7 +28,7 @@ SDK-foutmeldingen en lokaal bouwen voordat Q-Brain en de agent starten.
 is eenmalig de nieuwe ZIP-installatie nodig om de updatebron toe te voegen.
 
 **LoxBerry installeren:** volg [de LoxBerry-handleiding](docs/LOXBERRY.md).
-Download [het installatie-ZIP](https://github.com/Q-Home/Q-Brain/raw/refs/heads/main/packages/qbrain-loxberry-0.4.1.zip).
+Download [het installatie-ZIP](https://github.com/Q-Home/Q-Brain/raw/refs/heads/main/packages/qbrain-loxberry-0.4.2.zip).
 Bouw het installatiepakket met `python scripts/build_loxberry.py`. Gebruik het
 gegenereerde ZIP onder `dist/`, niet het GitHub-broncodearchief.
 
@@ -275,3 +275,21 @@ is de Loxone-compatibiliteit op jouw installatie nog niet bewezen.
 - [MCP Python SDK, v1](https://github.com/modelcontextprotocol/python-sdk/tree/v1.x)
 - [Ollama chat API](https://docs.ollama.com/api/chat)
 - [Ollama broncode](https://github.com/ollama/ollama)
+
+## Compacte hosts: 0.4.2
+
+Op een NanoPi R5C is qwen3:4b een zware keuze naast LoxBerry. Probeer onder
+Geavanceerd het model qwen3:0.6b en klik Start en analyseer automatisch. Het
+ontdekkingsprofiel wordt dan opnieuw opgebouwd uit dit kleinere model. Bestaande
+modelbestanden blijven behouden. Ook dit kleinere model moet op de echte host
+worden gevalideerd; vooral bij weinig RAM is succes niet gegarandeerd.
+
+De LoxBerry-service houdt maximaal één Ollama-model tegelijk geladen en verwerkt
+één aanvraag tegelijk. Beide analysepaden gebruiken een context van 4096 tokens;
+de ontdekkingscontext bevat maximaal 6000 JSON-tekens en maximaal vier voorstellen.
+EnergyManager2 krijgt voorrang. De volledige inventaris blijft in de pagina staan;
+de modelselectie is een subset en kan dus gegevens missen. De energietimeout is
+voor LoxBerry verhoogd naar 300 seconden. Herkende geheugen- en runnerfouten worden
+als vaste geschoonde meldingen getoond. Andere HTTP 500-fouten blijven ongespecificeerd.
+
+Zie [Ollama geheugen en gelijktijdige modellen](https://docs.ollama.com/faq).

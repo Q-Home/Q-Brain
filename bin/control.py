@@ -90,9 +90,9 @@ def compose_document(settings, runtime, folder):
     if settings.get('loxberry_sdk') and not settings['demo_mode']:
         env.update(LOXBERRY_SNAPSHOT_PATH='/telemetry/snapshot.json', LOXONE_USERNAME='', LOXONE_PASSWORD='', DISCOVERY_MODEL='qbrain-discovery:latest')
     env.update(MCP_TOKEN=settings['mcp_token'], OBSERVE_ONLY='true', ENABLE_EV_WRITE='false',
-               OLLAMA_URL='http://ollama:11434', HISTORY_PATH='/data/history.sqlite3')
+               OLLAMA_URL='http://ollama:11434', OLLAMA_TIMEOUT_SECONDS='300', HISTORY_PATH='/data/history.sqlite3')
     env = {k: v.replace('$', '$$') for k, v in env.items()}
-    common = {'image': 'qbrain-' + folder + ':0.4.1', 'environment': env,
+    common = {'image': 'qbrain-' + folder + ':0.4.2', 'environment': env,
               'pull_policy': 'never', 'read_only': True, 'tmpfs': ['/tmp'], 'cap_drop': ['ALL'],
               'security_opt': ['no-new-privileges:true'], 'restart': 'unless-stopped',
               'logging': {'driver': 'json-file', 'options': {'max-size': '10m', 'max-file': '3'}}}
@@ -102,7 +102,7 @@ def compose_document(settings, runtime, folder):
         'agent': {**common, 'environment': {**env, 'MCP_URL': 'http://qbox:8080/mcp'},
                   'command': ['python', '-m', 'qbox.agent'], 'healthcheck': {'disable': True},
                   'depends_on': {'qbox': {'condition': 'service_healthy'}}},
-        'ollama': {'image': 'ollama/ollama:0.11.10', 'volumes': ['ollama:/root/.ollama', {'type':'bind', 'source':'/var/lib/qbrain/' + folder + '/discovery.Modelfile', 'target':'/qbrain-discovery.Modelfile', 'read_only':True}],
+        'ollama': {'image': 'ollama/ollama:0.11.10', 'environment': {'OLLAMA_MAX_LOADED_MODELS':'1','OLLAMA_NUM_PARALLEL':'1','OLLAMA_CONTEXT_LENGTH':'4096'}, 'volumes': ['ollama:/root/.ollama', {'type':'bind', 'source':'/var/lib/qbrain/' + folder + '/discovery.Modelfile', 'target':'/qbrain-discovery.Modelfile', 'read_only':True}],
                    'restart': 'unless-stopped', 'logging': common['logging']},
     }, 'volumes': {'history': {}, 'ollama': {}}}
 

@@ -1,5 +1,12 @@
 # Wijzigingen
 
+## 0.4.2
+
+- Compacte modelcontext en korte ontdekkingsantwoorden voor beperkte hardware.
+- LoxBerry: één geladen model en één aanvraag tegelijk, 300 seconden analysetimeout.
+- Gerichte, geschoonde meldingen voor geheugenproblemen en gestopte modelprocessen.
+- Handleiding voor kleiner model op NanoPi R5C.
+
 ## 0.4.1
 
 - EnergyManager2: Gpwr/Ppwr/Spwr/Ssoc rechtstreeks herkennen en normaliseren, inclusief omgekeerd laadteken.

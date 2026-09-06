@@ -1,3 +1,8 @@
+# Validatie 0.4.2
+
+90 tests geslaagd, 2 Windows-skips. HTTP 500-geheugenclassificatie getest zonder
+serverdetails te lekken. Echte inference en RAM-gebruik op NanoPi R5C niet gemeten.
+
 # Validatie van Q-Brain 0.4.1
 
 89 tests geslaagd, 2 Linux-specifieke tests overgeslagen op Windows.

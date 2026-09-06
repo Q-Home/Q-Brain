@@ -43,3 +43,11 @@ def test_model_errors_are_specific_without_response_secrets():
     assert analysis_failure(error)['code']=='model_http_404'
     assert 'secret' not in str(analysis_failure(error))
     assert analysis_failure(httpx.ReadTimeout('secret'))['code']=='model_timeout'
+
+
+def test_memory_error_is_classified_without_exposing_server_text():
+    request=httpx.Request('POST','http://ollama/api/chat')
+    response=httpx.Response(500,request=request,json={'error':'model requires more system memory: secret'})
+    result=analysis_failure(httpx.HTTPStatusError('secret',request=request,response=response))
+    assert result['code']=='model_memory'
+    assert 'secret' not in str(result)

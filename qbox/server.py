@@ -64,7 +64,7 @@ def create_app(config=None):
         if not isinstance(adapter, LoxBerryAdapter):
             return None
         rows=inventory(adapter.document())
-        key=fingerprint(rows,c.discovery_model or c.ollama_model)
+        key=fingerprint(rows,'compact-v2:' + (c.discovery_model or c.ollama_model))
         previous=history.latest('discovery')
         if previous and previous['payload'].get('fingerprint') == key and time.time()-previous['timestamp'] < 3600:
             return previous['payload']
