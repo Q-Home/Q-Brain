@@ -22,7 +22,8 @@ with tempfile.TemporaryDirectory() as temporary:
     command = ['docker', 'compose', '-p', 'qbrain-start-ci', '-f', str(path)]
     try:
         subprocess.run([*command, 'build', 'qbox'], check=True, timeout=600)
-        subprocess.run([*command, 'up', '-d', '--no-build', '--wait', '--wait-timeout', '90', 'qbox', 'agent'], check=True, timeout=150)
+        subprocess.run([*command, 'up', '-d', '--no-build', '--wait', '--wait-timeout', '90', 'qbox'], check=True, timeout=150)
+        subprocess.run([*command, 'up', '-d', '--no-build', 'agent'], check=True, timeout=90)
         result = subprocess.run([*command, 'ps', '--services', '--status', 'running'], check=True, capture_output=True, text=True)
         assert set(result.stdout.split()) == {'qbox', 'agent'}, result.stdout
         print('Local image built; MCP and agent running with pull_policy=never.')
