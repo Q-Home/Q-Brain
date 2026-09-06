@@ -38,7 +38,7 @@ def main():
         os.chmod(path, 0o755 if path.is_dir() or path.name == 'control.py' else 0o644)
     # Exact operations only: no arbitrary Python, Docker or shell sudo permissions.
     rules = '\n'.join(f'loxberry ALL=(root) NOPASSWD: {target}/control.py {action}' for action in
-                      ('config', 'save', 'status', 'start', 'stop', 'pull', 'logs')) + '\n'
+                      ('config', 'save', 'status', 'start', 'stop', 'pull', 'logs', 'chat')) + '\n'
     rulefile = Path('/etc/sudoers.d') / ('qbrain-' + args.folder)
     temporary = rulefile.with_suffix('.new')
     temporary.write_text(rules, encoding='utf-8')

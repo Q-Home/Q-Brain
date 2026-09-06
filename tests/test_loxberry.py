@@ -38,7 +38,8 @@ def test_loxberry_archive(tmp_path):
         assert not any('/.env' in name or name.endswith('.env') or '__pycache__' in name for name in names)
         assert not any(name.startswith('webfrontend/html/') for name in names)
         for name in names:
-            assert b'\r\n' not in z.read(name)
+            if not name.startswith('webfrontend/htmlauth/chat/'):
+                assert b'\r\n' not in z.read(name)
         for name in ('preinstall.sh', 'preroot.sh', 'postroot.sh', 'bin/control.py', 'bin/healthcheck', 'daemon/daemon'):
             assert ((z.getinfo(name).external_attr >> 16) & 0o777) == 0o755
         metadata = configparser.ConfigParser()
@@ -46,6 +47,10 @@ def test_loxberry_archive(tmp_path):
         assert metadata['PLUGIN']['NAME'] == 'qbrain'
         assert metadata['AUTHOR']['NAME'] and '@' in metadata['AUTHOR']['EMAIL']
         assert metadata['SYSTEM']['LB_MINIMUM'] == '4.0.0'
+        assert 'webfrontend/htmlauth/chat/index.html' in names
+        with zipfile.ZipFile(ROOT / 'vendor/hollama-ui.zip') as frontend:
+            for entry in frontend.namelist():
+                assert z.read('webfrontend/htmlauth/chat/' + entry) == frontend.read(entry)
         assert z.read('bin/service/qbox/server.py') == (ROOT / 'qbox/server.py').read_bytes()
 
 

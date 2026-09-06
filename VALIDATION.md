@@ -1,3 +1,13 @@
+# Validatie 0.5.0
+
+92 tests geslaagd, 2 Windows-skips. Chatjobs getest op bearer-authenticatie, rol- en
+omvangvalidatie, actuele context, gelijktijdige vragen, voltooiing en annuleren.
+Chat-CSRF gecontroleerd via echte PHP-fixture. Browsercontrole van Hollama: openen
+in een submap/iframe, nieuw gesprek, vraag, antwoord en terugvinden na herladen.
+Het browserantwoord is een fixture; Ollama op de fysieke NanoPi is niet getest.
+Bestaande Hollama/Svelte-buildwaarschuwingen over initiële state blijven bestaan.
+De productiebuild is geslaagd. Pakketcontrole vergelijkt de statische bundel bytegetrouw.
+
 # Validatie 0.4.2
 
 90 tests geslaagd, 2 Windows-skips. HTTP 500-geheugenclassificatie getest zonder

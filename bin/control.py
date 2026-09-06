@@ -29,7 +29,7 @@ DEFAULTS = {
 }
 MAPPINGS = ('grid_power', 'pv_power', 'battery_soc', 'battery_power', 'ev_power')
 ACTIONS = ('config', 'save', 'status', 'start', 'stop', 'pull', 'logs', 'boot',
-           'initialize', 'prepare_upgrade', 'uninstall', '_worker', '_collect')
+           'chat', 'initialize', 'prepare_upgrade', 'uninstall', '_worker', '_collect')
 
 
 class ControlError(Exception):
@@ -92,7 +92,7 @@ def compose_document(settings, runtime, folder):
     env.update(MCP_TOKEN=settings['mcp_token'], OBSERVE_ONLY='true', ENABLE_EV_WRITE='false',
                OLLAMA_URL='http://ollama:11434', OLLAMA_TIMEOUT_SECONDS='300', HISTORY_PATH='/data/history.sqlite3')
     env = {k: v.replace('$', '$$') for k, v in env.items()}
-    common = {'image': 'qbrain-' + folder + ':0.4.2', 'environment': env,
+    common = {'image': 'qbrain-' + folder + ':0.5.0', 'environment': env,
               'pull_policy': 'never', 'read_only': True, 'tmpfs': ['/tmp'], 'cap_drop': ['ALL'],
               'security_opt': ['no-new-privileges:true'], 'restart': 'unless-stopped',
               'logging': {'driver': 'json-file', 'options': {'max-size': '10m', 'max-file': '3'}}}
@@ -366,6 +366,29 @@ class Controller:
             with self.lock():
                 self.settings()
             return {'initialized': True}
+        if action == 'chat':
+            raw = sys.stdin.read(32769)
+            if len(raw.encode('utf-8')) > 32768:
+                raise ControlError('Chatvraag te groot')
+            try:
+                payload = json.loads(raw)
+                if payload.get('op') not in ('create','status','cancel','models'):
+                    raise ValueError()
+            except (ValueError, AttributeError):
+                raise ControlError('Ongeldige chatvraag')
+            settings = self.settings()
+            request = urllib.request.Request(f"http://127.0.0.1:{settings['mcp_port']}/chat",
+                data=raw.encode('utf-8'), headers={'Content-Type':'application/json',
+                'Authorization':'Bearer '+settings['mcp_token']}, method='POST')
+            opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+            try:
+                with opener.open(request,timeout=10) as response: return json.load(response)
+            except urllib.error.HTTPError as error:
+                try: detail = json.load(error).get('error','Chat niet beschikbaar')
+                except ValueError: detail = 'Chat niet beschikbaar'
+                raise ControlError(detail)
+            except OSError:
+                raise ControlError('Q-Brain is niet bereikbaar. Start de service.')
         if action == 'config':
             config = public_config(self.settings())
             try:

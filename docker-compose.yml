@@ -2,7 +2,7 @@ name: qbox-energy
 services:
   qbox:
     build: .
-    image: qbox-energy:0.4.2
+    image: qbox-energy:0.5.0
     pull_policy: never
     env_file: .env
     ports:
@@ -18,7 +18,7 @@ services:
       driver: json-file
       options: {max-size: "10m", max-file: "3"}
   agent:
-    image: qbox-energy:0.4.2
+    image: qbox-energy:0.5.0
     pull_policy: never
     env_file: .env
     environment:

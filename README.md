@@ -1,7 +1,7 @@
 # Q-Brain — LoxBerry-plugin en lokale energie-assistent
 
 Lokale energie-observatie en AI-advies via **MCP → Loxone** en **Ollama**.
-Versie 0.4.2 hergebruikt de Miniserver via de LoxBerry PHP SDK, zoekt automatisch
+Versie 0.5.0 hergebruikt de Miniserver via de LoxBerry PHP SDK, zoekt automatisch
 naar ondersteunde energiemeetpunten en toont lokale analyses. Eén startknop regelt
 services en modeldownload. Credentials blijven op de LoxBerry-host. Niet ondersteunde
 blokken en dubbelzinnige meetpunten worden expliciet gemeld; zie de handleiding.
@@ -28,7 +28,7 @@ SDK-foutmeldingen en lokaal bouwen voordat Q-Brain en de agent starten.
 is eenmalig de nieuwe ZIP-installatie nodig om de updatebron toe te voegen.
 
 **LoxBerry installeren:** volg [de LoxBerry-handleiding](docs/LOXBERRY.md).
-Download [het installatie-ZIP](https://github.com/Q-Home/Q-Brain/raw/refs/heads/main/packages/qbrain-loxberry-0.4.2.zip).
+Download [het installatie-ZIP](https://github.com/Q-Home/Q-Brain/raw/refs/heads/main/packages/qbrain-loxberry-0.5.0.zip).
 Bouw het installatiepakket met `python scripts/build_loxberry.py`. Gebruik het
 gegenereerde ZIP onder `dist/`, niet het GitHub-broncodearchief.
 
@@ -293,3 +293,35 @@ voor LoxBerry verhoogd naar 300 seconden. Herkende geheugen- en runnerfouten wor
 als vaste geschoonde meldingen getoond. Andere HTTP 500-fouten blijven ongespecificeerd.
 
 Zie [Ollama geheugen en gelijktijdige modellen](https://docs.ollama.com/faq).
+
+## Chat met Hollama — 0.5.0
+
+Open de plugin en klik **Chat openen / sluiten**, vervolgens **New session**.
+Stel bijvoorbeeld: “Analyseer mijn netafname” of “Wat weet je over mijn batterij?”.
+Het ingestelde Ollama-model wordt automatisch gekozen; geen extra account of
+serverinstelling nodig. Voor NanoPi R5C blijft qwen3:0.6b aanbevolen.
+
+Dit is een aangepaste statische distributie van [Hollama](https://github.com/fmaclen/hollama),
+ingebed achter de LoxBerry-login. Er is geen extra container of openbare Ollama-poort.
+Vragen lopen via de bestaande CSRF-beveiligde plugincontroller naar een vaste,
+bearer-beveiligde chatroute. Alleen tekstgesprekken worden ondersteund. Alternatieve
+servers, modelbeheer vanuit Hollama, afbeeldingen en modelparameters zijn niet
+beschikbaar in deze integratie. De interface gebruikt de beschikbare Hollama-talen;
+Q-Brain instrueert het model om in het Nederlands te antwoorden.
+
+Elke vraag krijgt een nieuwe energiesnapshot mee: bekende globale waarden, timestamp
+en maximaal twaalf apparaatobservaties. Zonder recente data wordt dat expliciet aan
+het model gemeld. De chat kent geen schrijftools, forecastdienst of verborgen historie.
+De laatste zes user/assistant-berichten gaan mee (maximaal 1000 tekens per bericht);
+een nieuwe vraag boven die lengte wordt geweigerd. Gesprekken worden in deze browser
+bewaard en zijn dus niet automatisch op een ander toestel beschikbaar. Browseropslag
+verwijderen wist ook de gespreksgeschiedenis.
+
+Een antwoord wordt als geheel getoond zodra het klaar is. Chatvragen wachten zo nodig
+op een lopende automatische analyse. Maximaal één chatvraag is tegelijk actief, met
+annuleren en een maximale wachttijd. De pagina haalt korte statusupdates op, zodat
+lange modelinference geen langdurig PHP-verzoek veroorzaakt. Tijdelijke serverjobs
+zijn alleen in geheugen en vervallen bij herstart of opruiming. Een kleinere chat-UI
+verhelpt onvoldoende modelgeheugen niet; bestaande Ollama-foutmeldingen blijven zichtbaar.
+
+Zie [Hollama broncode en bouwinstructies](https://github.com/Q-Home/Q-Brain/blob/main/vendor/README.md).

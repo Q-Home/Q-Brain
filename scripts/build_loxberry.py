@@ -33,6 +33,17 @@ def build(destination, root=ROOT):
             info.external_attr = (0o100755 if executable else 0o100644) << 16
             info.compress_type = zipfile.ZIP_DEFLATED
             archive.writestr(info, source.read_bytes().replace(b'\r\n', b'\n'))
+        with zipfile.ZipFile(root / 'vendor/hollama-ui.zip') as frontend:
+            for entry in frontend.infolist():
+                name = entry.filename
+                if entry.is_dir(): continue
+                if name.startswith('/') or '..' in Path(name).parts:
+                    raise ValueError('Invalid frontend path')
+                info = zipfile.ZipInfo('webfrontend/htmlauth/chat/' + name, (2026,9,6,0,0,0))
+                info.create_system = 3
+                info.external_attr = 0o100644 << 16
+                info.compress_type = zipfile.ZIP_DEFLATED
+                archive.writestr(info, frontend.read(name))
     return destination
 
 

@@ -19,7 +19,7 @@ header('X-Content-Type-Options: nosniff');
 
 function qbrain_call(string $action, ?array $payload = null): array {
     global $lbpconfigdir;
-    $allowed = ['config', 'save', 'status', 'start', 'stop', 'pull', 'logs'];
+    $allowed = ['config', 'save', 'status', 'start', 'stop', 'pull', 'logs', 'chat'];
     $folder = basename($lbpconfigdir);
     if (!in_array($action, $allowed, true) || !preg_match('/^[A-Za-z0-9_-]+$/D', $folder)) {
         throw new RuntimeException('Ongeldige bewerking.');
@@ -56,18 +56,18 @@ $action = $_GET['action'] ?? '';
 if ($action !== '') {
     header('Content-Type: application/json; charset=utf-8');
     try {
-        if (!is_string($action) || !in_array($action, ['config', 'status', 'logs', 'save', 'start', 'stop', 'pull'], true)) {
+        if (!is_string($action) || !in_array($action, ['config', 'status', 'logs', 'save', 'start', 'stop', 'pull', 'chat'], true)) {
             http_response_code(400);
             throw new RuntimeException('Onbekende bewerking.');
         }
-        $mutating = in_array($action, ['save', 'start', 'stop', 'pull'], true);
+        $mutating = in_array($action, ['save', 'start', 'stop', 'pull', 'chat'], true);
         if ($mutating && ($_SERVER['REQUEST_METHOD'] !== 'POST' ||
                 !hash_equals($csrf, $_SERVER['HTTP_X_QBRAIN_CSRF'] ?? ''))) {
             http_response_code(403);
             throw new RuntimeException('Ongeldig formulier. Herlaad de pagina.');
         }
         $payload = null;
-        if ($action === 'save') {
+        if ($action === 'save' || $action === 'chat') {
             $raw = file_get_contents('php://input', false, null, 0, 32769);
             if (strlen($raw) > 32768) {
                 throw new RuntimeException('Configuratie is te groot.');
@@ -78,7 +78,7 @@ if ($action !== '') {
             }
         }
         $result = qbrain_call($action, $payload);
-        if ($mutating) {
+        if ($mutating && $action !== 'chat') {
             // Only operation names are logged: never payloads, passwords or tokens.
             $log = LBLog::newLog(['name' => 'qbrain-ui', 'addtime' => 1]);
             $log->LOGSTART('Q-Brain');

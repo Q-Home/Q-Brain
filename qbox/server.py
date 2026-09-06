@@ -14,6 +14,7 @@ from starlette.routing import Mount, Route
 
 from .config import Settings
 from .history import History
+from .chat import ChatJobs
 from .logging import event, setup_logging
 from .loxone import LoxoneAdapter
 from .discovery import LoxBerryAdapter
@@ -29,6 +30,7 @@ def create_app(config=None):
     history = History(c.history_path, c.history_max_rows)
     service = EnergyService(c, adapter, history)
     reason_lock = asyncio.Lock()
+    chat_jobs = ChatJobs(c, adapter, ollama, reason_lock)
     mcp = FastMCP("Q-Box Energy", stateless_http=True, json_response=True,
                   transport_security=TransportSecuritySettings(enable_dns_rebinding_protection=True,
                       allowed_hosts=c.mcp_allowed_hosts,
@@ -154,11 +156,12 @@ def create_app(config=None):
             async with mcp.session_manager.run():
                 yield
         finally:
+            await chat_jobs.close()
             await adapter.close()
             await ollama.close()
             history.close()
 
-    app = Starlette(routes=[Route("/healthz", health), Route("/readyz", ready), Route("/overview", overview), Mount("/", app=mcp_app)], lifespan=lifespan)
+    app = Starlette(routes=[Route("/chat", chat_jobs.endpoint, methods=["POST"]), Route("/healthz", health), Route("/readyz", ready), Route("/overview", overview), Mount("/", app=mcp_app)], lifespan=lifespan)
     return BearerAuth(app, c.mcp_token.get_secret_value())
 
 

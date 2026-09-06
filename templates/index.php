@@ -25,6 +25,11 @@
   <p id="service-status">Status wordt geladen…</p><p id="job-status"></p><p id="pending-status"></p>
   <p>De eerste start bouwt de services en downloadt het AI-model. Dit kan enkele minuten duren; je kunt deze pagina sluiten.</p>
   <button class="lb-btn" type="button" id="stop">Stop</button>
+  <section><h3>Vraag het Q-Brain</h3>
+    <p>Tekstchat met Hollama over je actuele energiegegevens. Gesprekken blijven in deze browser. Observe-only.</p>
+    <button class="lb-btn lb-btn-primary" type="button" id="open-chat">Chat openen / sluiten</button>
+    <iframe id="chat-frame" title="Q-Brain chat met Hollama" hidden style="width:100%;height:720px;border:1px solid #ddd;margin-top:12px"></iframe>
+  </section>
   <section><h3>Gevonden energiegegevens</h3><p id="discovery-status"></p>
     <ul id="signals"></ul><details><summary>Gevonden meetpunten en ondersteuning</summary><ul id="readings"></ul></details>
   </section>
@@ -50,7 +55,7 @@
     const url = new URL(window.location.href);
     if (url.pathname.endsWith('/')) url.pathname += 'index.php';
     url.search = ''; url.hash = ''; url.searchParams.set('action', action);
-    const mutate = ['save', 'start', 'stop'].includes(action);
+    const mutate = ['save', 'start', 'stop', 'chat'].includes(action);
     const abort = new AbortController();
     const timeout = window.setTimeout(() => abort.abort(), 45000);
     try {
@@ -69,6 +74,12 @@
       throw error;
     } finally { window.clearTimeout(timeout); }
   }
+  window.qbrainChat = payload => api('chat', payload);
+  document.getElementById('open-chat').onclick = () => {
+    const frame = document.getElementById('chat-frame');
+    if (!frame.src) frame.src = new URL('chat/index.html', window.location.href).href;
+    frame.hidden = !frame.hidden;
+  };
   async function loadSettings() {
     const data = await api('config');
     const servers = data.miniservers || [];

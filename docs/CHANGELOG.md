@@ -1,5 +1,13 @@
 # Wijzigingen
 
+## 0.5.0
+
+- Hollama-chat ingebed in de LoxBerry-plugin, met lokale browsergeschiedenis.
+- Automatische actuele energiecontext en vaste lokale Ollama-verbinding.
+- Achtergrondvragen, annuleren, begrensde context en gedeelde inferencelock.
+- Geen extra container, nieuwe openbare poort of uitvoerende modeltools.
+- Aangepaste Hollama-broncode, statische bundel en licentievermeldingen meegeleverd.
+
 ## 0.4.2
 
 - Compacte modelcontext en korte ontdekkingsantwoorden voor beperkte hardware.

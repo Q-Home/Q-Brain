@@ -59,6 +59,8 @@ def test_php_page_uses_design_system_and_never_embeds_credentials(php_page):
 def test_php_rejects_mutations_without_csrf(php_page):
     client, url, response = php_page
     token = re.search(r'const csrf = "([a-f0-9]{64})"', response.text).group(1)
+    assert client.get(url + '?action=chat').status_code == 403
+    assert client.post(url + '?action=chat', json={'op':'models'}).status_code == 403
     assert client.get(url + '?action=start').status_code == 403
     assert client.post(url + '?action=start', json={}).status_code == 403
     assert client.post(url + '?action=start', headers={'X-QBrain-CSRF': 'wrong'}, json={}).status_code == 403
