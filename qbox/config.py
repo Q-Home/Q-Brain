@@ -8,6 +8,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore", hide_input_in_errors=True)
+    loxberry_snapshot_path: str = ""
     demo_mode: bool = True
     observe_only: bool = True
     enable_ev_write: bool = False
@@ -44,7 +45,9 @@ class Settings(BaseSettings):
             url = urlsplit(getattr(self, name))
             if url.scheme not in ("http", "https") or not url.hostname or url.username or url.password or url.query or url.fragment:
                 raise ValueError(f"{name} must be an HTTP(S) URL without credentials/query/fragment")
-        if not self.demo_mode:
+        if self.loxberry_snapshot_path and (not self.observe_only or self.enable_ev_write or self.demo_mode):
+            raise ValueError("LoxBerry telemetry requires real observe-only mode")
+        if not self.demo_mode and not self.loxberry_snapshot_path:
             if not self.loxone_username or not self.loxone_password.get_secret_value():
                 raise ValueError("Real mode requires Loxone credentials")
             if self.loxone_url.startswith("http:") and not self.loxone_allow_http:

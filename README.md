@@ -1,16 +1,17 @@
 # Q-Brain — LoxBerry-plugin en lokale energie-assistent
 
 Lokale energie-observatie en AI-advies via **MCP → Loxone** en **Ollama**.
-Versie 0.2.1 voegt een **LoxBerry 4-plugin** toe met een native configuratiepagina,
-servicebeheer, installatie-/upgradehooks en een bouwbaar plugin-ZIP. De bestaande
-Docker-service blijft ook zelfstandig bruikbaar.
+Versie 0.3.0 hergebruikt de Miniserver via de LoxBerry PHP SDK, zoekt automatisch
+naar ondersteunde energiemeetpunten en toont lokale analyses. Eén startknop regelt
+services en modeldownload. Credentials blijven op de LoxBerry-host. Niet ondersteunde
+blokken en dubbelzinnige meetpunten worden expliciet gemeld; zie de handleiding.
+De zelfstandige Docker-variant met handmatige mappings blijft beschikbaar.
 
-Vanaf 0.2.1 installeert het LoxBerry-pakket ook ontbrekende hostdependencies,
-waaronder Docker Engine, Compose en Buildx. Upload het nieuwe ZIP als upgrade
-wanneer je 0.2.0 al hebt geïnstalleerd.
+Sinds 0.2.1 installeert het pluginpakket ontbrekende hostdependencies, waaronder
+Docker Engine, Compose en Buildx. 0.3.0 voegt PHP curl/XML toe.
 
 **LoxBerry installeren:** volg [de LoxBerry-handleiding](docs/LOXBERRY.md).
-Download [het installatie-ZIP](https://github.com/Q-Home/Q-Brain/raw/refs/heads/main/packages/qbrain-loxberry-0.2.1.zip).
+Download [het installatie-ZIP](https://github.com/Q-Home/Q-Brain/raw/refs/heads/main/packages/qbrain-loxberry-0.3.0.zip).
 Bouw het installatiepakket met `python scripts/build_loxberry.py`. Gebruik het
 gegenereerde ZIP onder `dist/`, niet het GitHub-broncodearchief.
 
@@ -20,6 +21,7 @@ optionele EV-writes geldt uitsluitend voor de zelfstandige Docker-variant.
 ## Wat werkt
 
 - Echte MCP Streamable HTTP-server op `/mcp`, beveiligd met een bearer-token.
+- LoxBerry SDK-reader met read-only telemetriemount, automatische scalar-detectie en onbekende waarden als `null`.
 - Expliciete Loxone HTTP-webserviceadapter voor vijf configureerbare signalen.
 - Lokale Ollama `/api/chat`-client met gevalideerd JSON-advies.
 - Een periodieke agent die via MCP `analyze_energy` oproept; adviezen worden nooit automatisch uitgevoerd.

@@ -28,6 +28,7 @@ def main():
     os.chmod(target, 0o755)
     shutil.copytree(source / 'service', target / 'service', dirs_exist_ok=True)
     shutil.copyfile(source / 'control.py', target / 'control.py')
+    shutil.copyfile(source / 'loxberry.php', target / 'loxberry.php')
     (target / 'installation.json').write_text(json.dumps({'folder': args.folder, 'home': str(home)}), encoding='utf-8')
     for path in target.rglob('*'):
         if path.is_symlink():

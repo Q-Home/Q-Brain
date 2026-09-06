@@ -56,7 +56,7 @@ main() {
     case "$major" in 11) suite=bullseye ;; 12) suite=bookworm ;; 13) suite=trixie ;;
         *) fail 'Supported Debian releases are 11, 12 and 13; refusing to guess the Docker repository.' ;; esac
     echo "<INFO> Preparing dependencies for Debian $major ($arch). Internet access is required."
-    for package in ca-certificates curl python3 sudo php-cli; do
+    for package in ca-certificates curl python3 sudo php-cli php-curl php-xml; do
         installed "$package" || missing+=("$package")
     done
     if [ "${#missing[@]}" -gt 0 ] || ! /usr/bin/docker compose version >/dev/null 2>&1 || ! /usr/bin/docker buildx version >/dev/null 2>&1; then

@@ -14,6 +14,7 @@ from .config import Settings
 from .history import History
 from .logging import event, setup_logging
 from .loxone import LoxoneAdapter
+from .discovery import LoxBerryAdapter
 from .ollama import OllamaClient
 from .policy import EnergyService
 
@@ -21,7 +22,7 @@ from .policy import EnergyService
 def create_app(config=None):
     setup_logging()
     c = config or Settings()
-    adapter = LoxoneAdapter(c)
+    adapter = LoxBerryAdapter(c) if c.loxberry_snapshot_path else LoxoneAdapter(c)
     ollama = OllamaClient(c)
     history = History(c.history_path, c.history_max_rows)
     service = EnergyService(c, adapter, history)
@@ -38,6 +39,13 @@ def create_app(config=None):
             return (await service.snapshot()).model_dump()
         except Exception:
             raise ValueError("Energy snapshot unavailable") from None
+
+    @mcp.tool()
+    async def discover_energy_signals() -> dict:
+        """Read automatic signal discovery and ambiguity, without changing mappings."""
+        if isinstance(adapter, LoxBerryAdapter):
+            return await adapter.discovery()
+        return {"mode": "demo" if c.demo_mode else "manual"}
 
     @mcp.tool()
     async def get_energy_history(limit: Annotated[int, Field(ge=1, le=100)] = 20) -> list[dict]:
@@ -87,6 +95,16 @@ def create_app(config=None):
         except Exception:
             return JSONResponse({"status": "not_ready"}, status_code=503)
 
+    async def overview(request):
+        # Cached local records only; never wait for Miniserver or model in the UI.
+        result = {"history": history.recent(10), "discovery": {}}
+        if isinstance(adapter, LoxBerryAdapter):
+            try:
+                result["discovery"] = await adapter.discovery()
+            except Exception:
+                result["discovery"] = {"error": "SDK-meetgegevens ontbreken of zijn verouderd."}
+        return JSONResponse(result)
+
     mcp_app = mcp.streamable_http_app()
 
     @asynccontextmanager
@@ -100,7 +118,7 @@ def create_app(config=None):
             await ollama.close()
             history.close()
 
-    app = Starlette(routes=[Route("/healthz", health), Route("/readyz", ready), Mount("/", app=mcp_app)], lifespan=lifespan)
+    app = Starlette(routes=[Route("/healthz", health), Route("/readyz", ready), Route("/overview", overview), Mount("/", app=mcp_app)], lifespan=lifespan)
     return BearerAuth(app, c.mcp_token.get_secret_value())
 
 

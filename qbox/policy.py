@@ -30,6 +30,8 @@ class EnergyService:
                 if time.monotonic() - self.last_attempt < c.write_cooldown_seconds:
                     raise PolicyError("Write cooldown active")
                 snapshot = await self.adapter.snapshot()
+                if any(getattr(snapshot, k) is None for k in c.read_mapping):
+                    raise PolicyError("Complete telemetry required for writes")
                 age = time.time() - snapshot.timestamp
                 if snapshot.source != "loxone" or not 0 <= age <= c.snapshot_max_age_seconds:
                     raise PolicyError("Fresh real telemetry required")

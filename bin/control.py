@@ -19,7 +19,8 @@ import urllib.request
 from urllib.parse import urlsplit
 
 DEFAULTS = {
-    'demo_mode': True, 'loxone_url': 'https://miniserver.local',
+    'loxberry_sdk': True, 'miniserver_id': '',
+    'demo_mode': False, 'loxone_url': 'https://miniserver.local',
     'loxone_username': '', 'loxone_password': '', 'loxone_allow_http': False,
     'loxone_grid_power': '', 'loxone_pv_power': '', 'loxone_battery_soc': '',
     'loxone_battery_power': '', 'loxone_ev_power': '',
@@ -28,7 +29,7 @@ DEFAULTS = {
 }
 MAPPINGS = ('grid_power', 'pv_power', 'battery_soc', 'battery_power', 'ev_power')
 ACTIONS = ('config', 'save', 'status', 'start', 'stop', 'pull', 'logs', 'boot',
-           'initialize', 'prepare_upgrade', 'uninstall', '_worker')
+           'initialize', 'prepare_upgrade', 'uninstall', '_worker', '_collect')
 
 
 class ControlError(Exception):
@@ -61,7 +62,9 @@ def validate(payload, current):
         valid = False
     if not valid:
         raise ControlError('Enter a Loxone HTTP(S) origin without credentials or a path')
-    if not merged['demo_mode']:
+    if not re.fullmatch(r'[0-9]{0,5}', merged['miniserver_id']):
+        raise ControlError('Invalid Miniserver selection')
+    if not merged['demo_mode'] and not merged['loxberry_sdk']:
         if not merged['loxone_username'] or not merged['loxone_password'] or not all(merged['loxone_' + k] for k in MAPPINGS):
             raise ControlError('Real mode requires credentials and all five signal mappings')
         if url.scheme == 'http' and not merged['loxone_allow_http']:
@@ -75,7 +78,7 @@ def validate(payload, current):
 
 
 def public_config(settings):
-    return {**{k: settings[k] for k in DEFAULTS if k != 'loxone_password'},
+    return {**{k: settings[k] for k in DEFAULTS if k not in ('loxone_password', 'loxone_username')},
             'loxone_password_set': bool(settings.get('loxone_password')),
             'observe_only': True, 'revision': settings['revision']}
 
@@ -84,16 +87,18 @@ def compose_document(settings, runtime, folder):
     # Dollar escaping is required even in JSON: Compose interpolates string values.
     env = {k.upper(): str(settings[k]).lower() if isinstance(settings[k], bool) else str(settings[k])
            for k in DEFAULTS if k != 'mcp_port'}
+    if settings.get('loxberry_sdk') and not settings['demo_mode']:
+        env.update(LOXBERRY_SNAPSHOT_PATH='/telemetry/snapshot.json', LOXONE_USERNAME='', LOXONE_PASSWORD='')
     env.update(MCP_TOKEN=settings['mcp_token'], OBSERVE_ONLY='true', ENABLE_EV_WRITE='false',
                OLLAMA_URL='http://ollama:11434', HISTORY_PATH='/data/history.sqlite3')
     env = {k: v.replace('$', '$$') for k, v in env.items()}
-    common = {'image': 'qbrain-' + folder + ':0.2.1', 'environment': env,
+    common = {'image': 'qbrain-' + folder + ':0.3.0', 'environment': env,
               'read_only': True, 'tmpfs': ['/tmp'], 'cap_drop': ['ALL'],
               'security_opt': ['no-new-privileges:true'], 'restart': 'unless-stopped',
               'logging': {'driver': 'json-file', 'options': {'max-size': '10m', 'max-file': '3'}}}
     return {'services': {
         'qbox': {**common, 'build': str(runtime / 'service'),
-                 'ports': [f"127.0.0.1:{settings['mcp_port']}:8080"], 'volumes': ['history:/data']},
+                 'ports': [f"127.0.0.1:{settings['mcp_port']}:8080"], 'volumes': ['history:/data'] + ([{'type': 'bind', 'source': '/var/lib/qbrain/' + folder + '/telemetry', 'target': '/telemetry', 'read_only': True}] if settings.get('loxberry_sdk') and not settings['demo_mode'] else [])},
         'agent': {**common, 'environment': {**env, 'MCP_URL': 'http://qbox:8080/mcp'},
                   'command': ['python', '-m', 'qbox.agent'], 'healthcheck': {'disable': True},
                   'depends_on': {'qbox': {'condition': 'service_healthy'}}},
@@ -139,7 +144,10 @@ class Controller:
         if settings is None:
             settings = {**DEFAULTS, 'mcp_token': secrets.token_hex(32), 'revision': 1}
             atomic_json(self.settings_file, settings)
-        return settings
+        if 'loxberry_sdk' not in settings:
+            settings = {**settings, 'loxberry_sdk': True, 'demo_mode': False, 'revision': settings['revision'] + 1}
+            atomic_json(self.settings_file, settings)
+        return {**DEFAULTS, **settings}
 
     @contextlib.contextmanager
     def lock(self):
@@ -159,12 +167,64 @@ class Controller:
         # Do not inherit DOCKER_HOST, COMPOSE_FILE, PATH or other caller overrides.
         return {'PATH': '/usr/sbin:/usr/bin:/sbin:/bin', 'HOME': '/root', 'LANG': 'C.UTF-8'}
 
+    def sdk(self, action, selected=''):
+        # SDK runs as the LoxBerry account, not root. Credentials never leave PHP.
+        home = read_json(self.runtime / 'installation.json')['home']
+        result = subprocess.run(['/usr/bin/sudo', '-u', 'loxberry', '/usr/bin/php',
+                                 str(self.runtime / 'loxberry.php'), action, selected],
+                                capture_output=True, timeout=30, env={**self.process_env(), 'LBHOMEDIR': home})
+        if result.returncode or len(result.stdout) > 1048576:
+            raise ControlError('LoxBerry SDK niet beschikbaar. Controleer Miniserver en SDK-dependencies.')
+        try:
+            data = json.loads(result.stdout)
+        except ValueError:
+            raise ControlError('LoxBerry SDK gaf geen geldig antwoord') from None
+        if data.get('error'):
+            raise ControlError('LoxBerry SDK: controleer Miniserver, rechten, verbinding en certificaat.')
+        return data
+
+    def start_collector(self):
+        directory = self.state / 'telemetry'
+        directory.mkdir(mode=0o755, exist_ok=True)
+        os.chmod(directory, 0o755)
+        generation = secrets.token_hex(16)
+        atomic_json(self.state / 'collector.json', {'generation': generation, 'miniserver_id': self.settings()['miniserver_id']})
+        subprocess.Popen([sys.executable, '-I', str(self.runtime / 'control.py'), '_collect', generation],
+                         stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                         start_new_session=True, env=self.process_env())
+
+    def collect(self, generation):
+        import fcntl
+        with (self.state / 'collector.lock').open('a') as handle:
+            fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
+            self.collect_loop(generation)
+
+    def collect_loop(self, generation):
+        # One generation per start. Old collectors cannot overwrite the new generation.
+        while read_json(self.state / 'collector.json', {}).get('generation') == generation:
+            settings = self.settings()
+            if not read_json(self.state / 'desired.json', {}).get('running'):
+                return
+            try:
+                data = self.sdk('collect', read_json(self.state / 'collector.json', {})['miniserver_id'])
+            except Exception:
+                data = {'timestamp': time.time(), 'error': 'SDK-uitlezing mislukt; controleer Miniserverselectie, rechten, verbinding en certificaat.'}
+            if read_json(self.state / 'collector.json', {}).get('generation') != generation:
+                return
+            destination = self.state / 'telemetry/snapshot.json'
+            atomic_json(destination, data)
+            os.chmod(destination, 0o644)
+            for _ in range(12):
+                time.sleep(5)
+                if read_json(self.state / 'collector.json', {}).get('generation') != generation or not read_json(self.state / 'desired.json', {}).get('running'):
+                    return
+
     def docker_available(self):
         try:
             subprocess.run(['/usr/bin/docker', 'compose', 'version'], check=True,
-                           capture_output=True, timeout=10, env=self.process_env())
+                           capture_output=True, timeout=3, env=self.process_env())
             subprocess.run(['/usr/bin/docker', 'info', '--format', '{{.ServerVersion}}'], check=True,
-                           capture_output=True, timeout=10, env=self.process_env())
+                           capture_output=True, timeout=3, env=self.process_env())
             return True
         except (OSError, subprocess.SubprocessError):
             return False
@@ -194,12 +254,32 @@ class Controller:
                                      start_new_session=True, pass_fds=(lockfd,), env=self.process_env())
         return {'accepted': True, 'action': action}
 
+    def ensure_model(self):
+        # An installed model works offline. Wait briefly for Ollama after container start.
+        for attempt in range(15):
+            try:
+                subprocess.run(self.command('exec', '-T', 'ollama', 'ollama', 'list'),
+                               check=True, capture_output=True, timeout=5, env=self.process_env())
+                break
+            except (OSError, subprocess.SubprocessError):
+                if attempt == 14:
+                    raise ControlError('Ollama start niet; controleer de servicelog.') from None
+                time.sleep(2)
+        try:
+            self.run('exec', '-T', 'ollama', 'ollama', 'show', self.settings()['ollama_model'], timeout=30)
+        except subprocess.CalledProcessError:
+            self.run('exec', '-T', 'ollama', 'ollama', 'pull', self.settings()['ollama_model'], timeout=7200)
+
     def worker(self, action, lockfd):
         # The inherited flock remains held until this process exits.
         os.fstat(lockfd)
         try:
             if action == 'start':
+                atomic_json(self.state / 'collector.json', {})
+                if self.settings()['loxberry_sdk'] and not self.settings()['demo_mode']:
+                    self.start_collector()
                 self.run('up', '-d', '--build', 'qbox', 'ollama', 'agent')
+                self.ensure_model()
                 atomic_json(self.state / 'applied.json', {'revision': self.settings()['revision']})
             elif action == 'stop':
                 if self.compose_file.exists():
@@ -218,14 +298,20 @@ class Controller:
     def status(self):
         settings = self.settings()
         ready = False
+        overview = {}
         try:
-            request = urllib.request.Request(f"http://127.0.0.1:{settings['mcp_port']}/readyz",
+            request = urllib.request.Request(f"http://127.0.0.1:{settings['mcp_port']}/overview",
                        headers={'Authorization': 'Bearer ' + settings['mcp_token']})
             opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
-            with opener.open(request, timeout=12) as response:
+            with opener.open(request, timeout=3) as response:
                 ready = response.status == 200
+                overview = json.load(response)
         except (OSError, ValueError):
             pass
+        service_available = ready
+        ready = ready and any(row.get('kind') == 'advice' and
+            0 <= time.time() - row.get('timestamp', 0) <= settings['reasoning_interval_seconds'] + 180
+            for row in overview.get('history', []))
         job = read_json(self.job_file, {})
         if job.get('status') == 'running':
             # A killed worker or power loss must not leave a permanent busy indicator.
@@ -234,7 +320,7 @@ class Controller:
                     job = {**job, 'status': 'interrupted'}
             except ControlError:
                 pass
-        return {'ready': ready, 'docker_available': self.docker_available(), 'observe_only': True,
+        return {'ready': ready, 'service_available': service_available, 'overview': overview, 'sdk': {'error': read_json(self.state / 'telemetry/snapshot.json', {}).get('error')}, 'docker_available': self.docker_available(), 'observe_only': True,
                 'demo_mode': settings['demo_mode'], 'job': job,
                 'pending_changes': read_json(self.state / 'applied.json', {}).get('revision') != settings['revision'],
                 'desired_running': read_json(self.state / 'desired.json', {}).get('running', False)}
@@ -257,7 +343,12 @@ class Controller:
                 self.settings()
             return {'initialized': True}
         if action == 'config':
-            return public_config(self.settings())
+            config = public_config(self.settings())
+            try:
+                config.update(self.sdk('list'))
+            except ControlError as error:
+                config.update(miniservers=[], sdk_error=str(error))
+            return config
         if action == 'save':
             raw = sys.stdin.read(32769)
             if len(raw) > 32768:
@@ -279,11 +370,13 @@ class Controller:
             return {'started': False}
         if action == 'prepare_upgrade':
             with self.lock():
+                atomic_json(self.state / 'collector.json', {})
                 if self.compose_file.exists():
                     self.run('down', '--remove-orphans', timeout=180)
             return {'stopped_for_upgrade': True}
         if action == 'uninstall':
             with self.lock():
+                atomic_json(self.state / 'collector.json', {})
                 if self.compose_file.exists():
                     self.run('down', '--remove-orphans', timeout=180)
                 atomic_json(self.state / 'desired.json', {'running': False})
@@ -301,6 +394,11 @@ def main():
     if len(sys.argv) < 2 or sys.argv[1] not in ACTIONS:
         raise ControlError('Unsupported action')
     controller = Controller(Path(__file__).parent)
+    if sys.argv[1] == '_collect':
+        if len(sys.argv) != 3 or not re.fullmatch(r'[a-f0-9]{32}', sys.argv[2]):
+            raise ControlError('Invalid collector generation')
+        controller.collect(sys.argv[2])
+        return
     if sys.argv[1] == '_worker':
         if len(sys.argv) != 4:
             raise ControlError('Invalid worker arguments')

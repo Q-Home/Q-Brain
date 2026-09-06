@@ -6,11 +6,11 @@ class Snapshot(BaseModel):
     model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
     timestamp: float
     source: Literal["demo", "loxone"]
-    grid_power: float  # W, positive import
-    pv_power: float = Field(ge=0)
-    battery_soc: float = Field(ge=0, le=100)
-    battery_power: float  # W, positive charging
-    ev_power: float = Field(ge=0)
+    grid_power: float | None = None  # W, positive import
+    pv_power: float | None = Field(default=None, ge=0)
+    battery_soc: float | None = Field(default=None, ge=0, le=100)
+    battery_power: float | None = None  # W, positive charging
+    ev_power: float | None = Field(default=None, ge=0)
 
 
 class Advice(BaseModel):

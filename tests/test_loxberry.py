@@ -23,7 +23,7 @@ builder = load_module('qbrain_builder', ROOT / 'scripts/build_loxberry.py')
 
 
 def settings():
-    return {**control.DEFAULTS, 'mcp_token': 'test-local-token', 'revision': 1}
+    return {**control.DEFAULTS, 'demo_mode': True, 'loxberry_sdk': False, 'mcp_token': 'test-local-token', 'revision': 1}
 
 
 def test_loxberry_archive(tmp_path):
@@ -182,3 +182,52 @@ def test_linux_flock_blocks_overlapping_operations(controller):
         with pytest.raises(control.ControlError):
             with controller.lock():
                 pass
+
+
+def test_sdk_compose_contains_no_loxone_credentials(tmp_path):
+    config = {**settings(), 'loxberry_sdk': True, 'demo_mode': False,
+              'loxone_username': 'private-user', 'loxone_password': 'private-password'}
+    compose = control.compose_document(config, tmp_path, 'qbrain01')
+    assert 'private-user' not in json.dumps(compose) and 'private-password' not in json.dumps(compose)
+    mount = compose['services']['qbox']['volumes'][1]
+    assert mount == {'type': 'bind', 'source': '/var/lib/qbrain/qbrain01/telemetry', 'target': '/telemetry', 'read_only': True}
+    assert 'config/system' not in json.dumps(compose)
+    assert control.validate({'demo_mode': False, 'loxberry_sdk': True}, settings())['loxberry_sdk']
+
+
+def test_sdk_upgrade_migrates_without_credentials_in_public_config(controller):
+    old = settings(); old.pop('loxberry_sdk'); old.pop('miniserver_id')
+    old['loxone_username'] = 'private-user'
+    control.atomic_json(controller.settings_file, old)
+    migrated = controller.settings()
+    assert migrated['loxberry_sdk'] and not migrated['demo_mode']
+    assert migrated['revision'] == old['revision'] + 1
+    assert 'private-user' not in json.dumps(control.public_config(migrated))
+    assert controller.settings()['revision'] == migrated['revision']
+
+
+def test_sdk_start_sets_up_collector_and_model(controller, monkeypatch):
+    control.atomic_json(controller.settings_file, {**settings(), 'demo_mode': False, 'loxberry_sdk': True})
+    controller.start_collector = Mock()
+    controller.ensure_model = Mock()
+    controller.run = Mock()
+    monkeypatch.setattr(control.os, 'fstat', lambda fd: None)
+    monkeypatch.setattr(control.os, 'close', lambda fd: None)
+    controller.worker('start', 123)
+    controller.start_collector.assert_called_once()
+    controller.ensure_model.assert_called_once()
+    assert control.read_json(controller.job_file)['status'] == 'completed'
+
+
+def test_existing_model_does_not_download(controller, monkeypatch):
+    monkeypatch.setattr(control.subprocess, 'run', Mock())
+    controller.run = Mock()
+    controller.ensure_model()
+    controller.run.assert_called_once_with('exec', '-T', 'ollama', 'ollama', 'show', 'qwen3:4b', timeout=30)
+
+
+def test_missing_model_downloads(controller, monkeypatch):
+    monkeypatch.setattr(control.subprocess, 'run', Mock())
+    controller.run = Mock(side_effect=[control.subprocess.CalledProcessError(1, ['show']), None])
+    controller.ensure_model()
+    assert controller.run.call_args.args == ('exec', '-T', 'ollama', 'ollama', 'pull', 'qwen3:4b')

@@ -44,7 +44,7 @@ class OllamaFixture(BaseHTTPRequestHandler):
         self.wfile.write(json.dumps({"message": {"content": json.dumps({"summary": "Demo observation", "confidence": "low", "reasons": ["No forecast supplied"], "suggested_ev_limit_w": 1000})}}).encode())
 
 
-@pytest.fixture(params=[False, True], ids=["observe", "controlled-write"])
+@pytest.fixture(params=[False, True, "sdk"], ids=["observe", "controlled-write", "sdk"])
 def running_service(tmp_path, request):
     mock = FixtureServer(("127.0.0.1", 0), OllamaFixture)
     thread = threading.Thread(target=mock.serve_forever, daemon=True)
@@ -55,11 +55,16 @@ def running_service(tmp_path, request):
     url = f"http://127.0.0.1:{port}"
     env = {**os.environ, "MCP_TOKEN": TOKEN, "DEMO_MODE": "true", "OBSERVE_ONLY": "true", "ENABLE_EV_WRITE": "false",
            "HISTORY_PATH": str(tmp_path / "history.sqlite3"), "OLLAMA_URL": f"http://127.0.0.1:{mock.server_port}"}
-    if request.param:
+    if request.param is True:
         env.update(DEMO_MODE="false", OBSERVE_ONLY="false", ENABLE_EV_WRITE="true", LOXONE_WATCHDOG_CONFIRMED="true",
                    LOXONE_URL=f"http://127.0.0.1:{mock.server_port}", LOXONE_ALLOW_HTTP="true",
                    LOXONE_USERNAME="test", LOXONE_PASSWORD="secret", LOXONE_EV_LIMIT_INPUT="EVCap")
         env.update({f"LOXONE_{key}": key for key in ["GRID_POWER", "PV_POWER", "BATTERY_SOC", "BATTERY_POWER", "EV_POWER"]})
+    if request.param == "sdk":
+        telemetry = tmp_path / "telemetry.json"
+        telemetry.write_text(json.dumps({"timestamp": time.time(), "error": None, "readings": [
+            {"id": "pv", "name": "PV vermogen", "value": 2, "format": "%.1f kW", "status": "read"}]}))
+        env.update(DEMO_MODE="false", LOXBERRY_SNAPSHOT_PATH=str(telemetry))
     process = subprocess.Popen([sys.executable, "-m", "uvicorn", "qbox.server:create_app", "--factory", "--host", "127.0.0.1", "--port", str(port), "--no-access-log"], env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     try:
         for _ in range(100):
@@ -83,20 +88,23 @@ def running_service(tmp_path, request):
 
 
 async def test_full_mcp_cycle(running_service):
-    url, writes = running_service
+    url, mode = running_service
+    writes = mode is True
     async with httpx.AsyncClient(trust_env=False) as client:
         assert (await client.get(url + "/readyz")).status_code == 401
+        assert (await client.get(url + "/overview")).status_code == 401
         assert (await client.post(url + "/mcp", json={})).status_code == 401
     async with httpx.AsyncClient(headers={"Authorization": f"Bearer {TOKEN}"}, trust_env=False, timeout=15) as client:
         assert (await client.get(url + "/readyz")).status_code == 200
+        assert (await client.get(url + "/overview")).status_code == 200
         async with streamable_http_client(url + "/mcp", http_client=client) as (read, write, _):
             async with ClientSession(read, write) as session:
                 await session.initialize()
                 names = {t.name for t in (await session.list_tools()).tools}
-                expected = {"get_energy_snapshot", "get_energy_history", "get_operating_mode", "analyze_energy"}
+                expected = {"get_energy_snapshot", "get_energy_history", "get_operating_mode", "analyze_energy", "discover_energy_signals"}
                 assert names == expected | ({"set_ev_power_limit"} if writes else set())
                 snap = await session.call_tool("get_energy_snapshot", {})
-                assert not snap.isError and json.loads(snap.content[0].text)["source"] == ("loxone" if writes else "demo")
+                assert not snap.isError and json.loads(snap.content[0].text)["source"] == ("loxone" if mode else "demo")
                 advice = await session.call_tool("analyze_energy", {})
                 assert not advice.isError and json.loads(advice.content[0].text)["executed"] is False
                 invalid = await session.call_tool("get_energy_history", {"limit": 10000})
