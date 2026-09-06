@@ -21,7 +21,7 @@ function qbrain_http_read(array $server, string $path): array {
     curl_setopt_array($curl, [CURLOPT_HEADER => false, CURLOPT_FOLLOWLOCATION => false,
         CURLOPT_CONNECTTIMEOUT => 3, CURLOPT_TIMEOUT => 3,
         CURLOPT_PROTOCOLS => CURLPROTO_HTTP | CURLPROTO_HTTPS,
-        CURLOPT_SSL_VERIFYPEER => true, CURLOPT_SSL_VERIFYHOST => 2,
+        CURLOPT_SSL_VERIFYPEER => false, CURLOPT_SSL_VERIFYHOST => 0,
         CURLOPT_WRITEFUNCTION => function($handle, string $chunk) use (&$body, &$large): int {
             if (strlen($body) + strlen($chunk) > 8388608) { $large = true; return 0; }
             $body .= $chunk; return strlen($chunk);
@@ -70,7 +70,7 @@ try {
         $read = function(string $path) use ($id, $deadline, $servers): string {
             if (microtime(true) >= $deadline) { throw new QBrainReadError('timeout'); }
             if (function_exists('mshttp_call2')) {
-                [$body, $info] = mshttp_call2($id, $path, ['timeout' => 3, 'ssl_verify_mode' => 1, 'ssl_verify_hostname' => 1]);
+                [$body, $info] = mshttp_call2($id, $path, ['timeout' => 3, 'ssl_verify_mode' => 0, 'ssl_verify_hostname' => 0]);
             } else {
                 [$body, $info] = qbrain_http_read($servers[$id], $path);
             }

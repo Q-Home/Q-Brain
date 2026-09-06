@@ -1,5 +1,11 @@
 # Wijzigingen
 
+## 0.3.3
+
+Certificaat- en hostnaamcontrole uitgeschakeld voor de lokale Miniserver, zowel
+via de nieuwere SDK als de LoxBerry 4.0.0-reader. HTTPS blijft behouden wanneer
+dit centraal is ingesteld. De controle van update-downloads blijft ongewijzigd.
+
 ## 0.3.2
 
 - Ondersteuning voor de PHP SDK van LoxBerry 4.0.0 zonder mshttp_call2.

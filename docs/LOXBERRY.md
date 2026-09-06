@@ -1,4 +1,4 @@
-# Q-Brain voor LoxBerry 4 — versie 0.3.2
+# Q-Brain voor LoxBerry 4 — versie 0.3.3
 
 Q-Brain gebruikt de Miniserver die al in LoxBerry is ingesteld. De lokale
 LoxBerry PHP SDK leest de verbinding en meetwaarden; alleen meetgegevens gaan
@@ -11,7 +11,7 @@ Deze plugin werkt uitsluitend in observe-only: hij stuurt geen apparaten aan.
    De installer installeert ontbrekende Python 3, sudo, PHP CLI, PHP curl/XML,
    CA-certificaten, curl, Docker Engine, Compose en Buildx. Bestaande Docker-installaties
    blijven behouden. De SDK zelf wordt door LoxBerry geleverd.
-2. Upload [qbrain-loxberry-0.3.2.zip](https://github.com/Q-Home/Q-Brain/raw/refs/heads/main/packages/qbrain-loxberry-0.3.2.zip)
+2. Upload [qbrain-loxberry-0.3.3.zip](https://github.com/Q-Home/Q-Brain/raw/refs/heads/main/packages/qbrain-loxberry-0.3.3.zip)
    bij LoxBerry → Pluginbeheer. Gebruik het installatiepakket, niet GitHub Download ZIP.
 3. Open Q-Brain. Eén geconfigureerde Miniserver wordt automatisch gekozen.
    Bij meerdere Miniservers kies je er één. Zonder Miniserver voeg je die eerst
@@ -112,12 +112,12 @@ nieuw PHP-proces en leest de centrale configuratie opnieuw. Credentials worden
 niet teruggestuurd naar Python, Docker, de browser of AI. Labels uit de installatie
 worden als tekst weergegeven; alleen numerieke telemetrie gaat naar het model.
 
-HTTPS-certificaten worden gecontroleerd. HTTP wordt alleen gebruikt wanneer die
-verbinding centraal in LoxBerry zo is ingesteld. Bij een zelfondertekend certificaat
-moet de host dat certificaat vertrouwen; de plugin schakelt verificatie niet uit.
+Vanaf 0.3.3 wordt het HTTPS-certificaat van de Miniserver niet gecontroleerd,
+zoals gevraagd voor deze lokale installatie. Dit geldt voor zowel de SDK als
+de compatibiliteitsreader. Het centraal ingestelde HTTP/HTTPS-protocol blijft behouden.
 Vanaf 0.3.2 ondersteunt Q-Brain ook LoxBerry 4.0.0: als `mshttp_call2` ontbreekt,
 gebruikt een beperkte PHP-curl-reader de verbinding van `LBSystem::get_miniservers()`.
-Dezelfde tijdslimieten, TLS-controle en read-only grenzen blijven gelden.
+Dezelfde tijdslimieten en read-only grenzen blijven gelden.
 De nieuwere SDK-functie wordt gebruikt wanneer die beschikbaar is.
 
 De controller en PHP-reader staan onder `/usr/local/lib/qbrain/<folder>`.
@@ -145,7 +145,7 @@ is alleen op host-loopback bereikbaar. Ollama publiceert geen hostpoort.
 - **SDK-fout in 0.3.2:** de melding onderscheidt Miniserverselectie, HTTP 401/403,
   TLS-certificaat, verbinding/timeout en ongeldige configuratiestructuur.
 - **Overige SDK-uitleesproblemen:** controleer de geselecteerde Miniserver, accountrechten,
-  bereikbaarheid, certificaatvertrouwen en beschikbare PHP curl/XML-modules.
+  bereikbaarheid en beschikbare PHP curl/XML-modules.
 - **Meetpunten niet herkend:** open het overzicht met gevonden meetpunten. Controleer
   type, naam, eenheid en eventuele dubbele kandidaten; zie de ondersteuningstabel.
 - **Nog geen analyse:** wacht op de modeldownload en een volgende analysecylus.

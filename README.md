@@ -10,14 +10,16 @@ De zelfstandige Docker-variant met handmatige mappings blijft beschikbaar.
 Sinds 0.2.1 installeert het pluginpakket ontbrekende hostdependencies, waaronder
 Docker Engine, Compose en Buildx. 0.3.1 voegt PHP curl/XML toe.
 
-**Nieuw in 0.3.2:** compatibiliteit met de PHP SDK van LoxBerry 4.0.0, specifieke
+**Nieuw in 0.3.3:** geen certificaat- of hostnaamcontrole bij de lokale Miniserververbinding.
+
+**Sinds 0.3.2:** compatibiliteit met de PHP SDK van LoxBerry 4.0.0, specifieke
 SDK-foutmeldingen en lokaal bouwen voordat Q-Brain en de agent starten.
 
 **Sinds 0.3.1:** updates via LoxBerry Pluginbeheer (Releases). Vanaf oudere versies
 is eenmalig de nieuwe ZIP-installatie nodig om de updatebron toe te voegen.
 
 **LoxBerry installeren:** volg [de LoxBerry-handleiding](docs/LOXBERRY.md).
-Download [het installatie-ZIP](https://github.com/Q-Home/Q-Brain/raw/refs/heads/main/packages/qbrain-loxberry-0.3.2.zip).
+Download [het installatie-ZIP](https://github.com/Q-Home/Q-Brain/raw/refs/heads/main/packages/qbrain-loxberry-0.3.3.zip).
 Bouw het installatiepakket met `python scripts/build_loxberry.py`. Gebruik het
 gegenereerde ZIP onder `dist/`, niet het GitHub-broncodearchief.
 

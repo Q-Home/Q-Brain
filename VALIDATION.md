@@ -1,3 +1,10 @@
+# Validatie van Q-Brain 0.3.3
+
+78 tests geslaagd, 2 Linux-specifieke tests overgeslagen op Windows.
+De compatibiliteitsreader is via echte HTTPS getest met een zelfondertekend
+certificaat en afwijkende hostnaam. De native SDK-aanroep is gecontroleerd op
+uitgeschakelde certificaat- en hostnaamverificatie. Fysieke installatie nog niet getest.
+
 # Validatie van Q-Brain 0.3.2
 
 77 tests geslaagd, 2 Linux-specifieke tests overgeslagen op Windows.

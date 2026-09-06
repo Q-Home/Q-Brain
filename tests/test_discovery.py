@@ -115,7 +115,7 @@ def test_sdk_uses_only_discovered_scalar_read_commands(sdk):
     assert data['readings'][0]['value'] == 0  # real zero survives the SDK fallback getter
     assert data['readings'][1]['status'] == 'unsupported_control'
     assert [x[1] for x in calls] == ['/data/LoxAPP3.json', f'/dev/sps/io/{UUID}/all', f'/dev/sps/io/{UUID}']
-    assert all(x[2]['ssl_verify_mode'] == 1 and x[2]['timeout'] == 3 for x in calls)
+    assert all(x[2]['ssl_verify_mode'] == 0 and x[2]['ssl_verify_hostname'] == 0 and x[2]['timeout'] == 3 for x in calls)
     assert 'hidden-' not in result.stdout
 
 
@@ -144,28 +144,51 @@ def test_sdk_errors_are_specific_and_never_expose_raw_response(sdk, code, status
     assert 'hidden-password' not in result.stdout and 'private-url' not in result.stdout
 
 
-@pytest.mark.parametrize('status', [200, 401, 302])
+@pytest.mark.parametrize('status', [200, 401, 302, 'self-signed-https'])
 def test_loxberry_400_compatibility_reads_through_real_http(sdk, status):
     import threading
     from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
     # Older SDK really has NO mshttp_call2. Keep the real Q-Brain curl transport.
     (sdk.root / 'libs/phplib/loxberry_io.php').write_text('<?php')
+    tls = status == 'self-signed-https'
+    if tls: status = 200
     requests = []
     class Server(BaseHTTPRequestHandler):
         def log_message(self, *args): pass
         def do_GET(self):
             requests.append((self.path, self.headers.get('Authorization')))
+            if self.path == '/data/LoxAPP3.json':
+                body = json.dumps({'controls': {UUID: {'name':'PV vermogen', 'type':'InfoOnlyAnalog', 'details':{'format':'%.1f kW'}}}}).encode()
+            else:
+                body = b'<LL Code="200" value="3.2"/>'
             self.send_response(status)
             if status == 302: self.send_header('Location', '/must-not-follow')
+            self.send_header('Content-Length', str(len(body)))
             self.end_headers()
-            if self.path == '/data/LoxAPP3.json':
-                self.wfile.write(json.dumps({'controls': {UUID: {'name':'PV vermogen', 'type':'InfoOnlyAnalog', 'details':{'format':'%.1f kW'}}}}).encode())
-            else:
-                self.wfile.write(b'<LL Code="200" value="3.2"/>')
+            self.wfile.write(body)
     server = ThreadingHTTPServer(('127.0.0.1', 0), Server)
+    if tls:
+        import ssl
+        import datetime
+        from cryptography import x509
+        from cryptography.x509.oid import NameOID
+        from cryptography.hazmat.primitives import hashes, serialization
+        from cryptography.hazmat.primitives.asymmetric import rsa
+        key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+        name = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, 'miniserver.invalid')])
+        now = datetime.datetime.now(datetime.timezone.utc)
+        cert = (x509.CertificateBuilder().subject_name(name).issuer_name(name).public_key(key.public_key())
+                .serial_number(x509.random_serial_number()).not_valid_before(now - datetime.timedelta(days=1))
+                .not_valid_after(now + datetime.timedelta(days=1)).sign(key, hashes.SHA256()))
+        certfile = sdk.root / 'cert.pem'; keyfile = sdk.root / 'key.pem'
+        certfile.write_bytes(cert.public_bytes(serialization.Encoding.PEM))
+        keyfile.write_bytes(key.private_bytes(serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8, serialization.NoEncryption()))
+        context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+        context.load_cert_chain(certfile, keyfile)
+        server.socket = context.wrap_socket(server.socket, server_side=True)
     thread = threading.Thread(target=server.serve_forever, daemon=True); thread.start()
     try:
-        result, _ = sdk(SDK_ORIGIN=f'http://hidden-user:hidden-password@127.0.0.1:{server.server_port}')
+        result, _ = sdk(SDK_ORIGIN=f'{"https" if tls else "http"}://hidden-user:hidden-password@127.0.0.1:{server.server_port}')
         assert 'hidden-password' not in result.stdout
         if status == 200:
             assert result.returncode == 0, result.stdout + result.stderr
