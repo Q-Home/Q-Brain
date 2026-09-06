@@ -92,7 +92,7 @@ def compose_document(settings, runtime, folder):
     env.update(MCP_TOKEN=settings['mcp_token'], OBSERVE_ONLY='true', ENABLE_EV_WRITE='false',
                OLLAMA_URL='http://ollama:11434', HISTORY_PATH='/data/history.sqlite3')
     env = {k: v.replace('$', '$$') for k, v in env.items()}
-    common = {'image': 'qbrain-' + folder + ':0.3.0', 'environment': env,
+    common = {'image': 'qbrain-' + folder + ':0.3.1', 'environment': env,
               'read_only': True, 'tmpfs': ['/tmp'], 'cap_drop': ['ALL'],
               'security_opt': ['no-new-privileges:true'], 'restart': 'unless-stopped',
               'logging': {'driver': 'json-file', 'options': {'max-size': '10m', 'max-file': '3'}}}

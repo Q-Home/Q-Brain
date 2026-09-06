@@ -1,4 +1,4 @@
-# Q-Brain voor LoxBerry 4 — versie 0.3.0
+# Q-Brain voor LoxBerry 4 — versie 0.3.1
 
 Q-Brain gebruikt de Miniserver die al in LoxBerry is ingesteld. De lokale
 LoxBerry PHP SDK leest de verbinding en meetwaarden; alleen meetgegevens gaan
@@ -11,7 +11,7 @@ Deze plugin werkt uitsluitend in observe-only: hij stuurt geen apparaten aan.
    De installer installeert ontbrekende Python 3, sudo, PHP CLI, PHP curl/XML,
    CA-certificaten, curl, Docker Engine, Compose en Buildx. Bestaande Docker-installaties
    blijven behouden. De SDK zelf wordt door LoxBerry geleverd.
-2. Upload [qbrain-loxberry-0.3.0.zip](https://github.com/Q-Home/Q-Brain/raw/refs/heads/main/packages/qbrain-loxberry-0.3.0.zip)
+2. Upload [qbrain-loxberry-0.3.1.zip](https://github.com/Q-Home/Q-Brain/raw/refs/heads/main/packages/qbrain-loxberry-0.3.1.zip)
    bij LoxBerry → Pluginbeheer. Gebruik het installatiepakket, niet GitHub Download ZIP.
 3. Open Q-Brain. Eén geconfigureerde Miniserver wordt automatisch gekozen.
    Bij meerdere Miniservers kies je er één. Zonder Miniserver voeg je die eerst
@@ -30,6 +30,23 @@ Een bewust ingestelde demomodus vanaf 0.3.0 blijft bij volgende upgrades behoude
 Stop behoudt alle gegevens. Na herstart van de host hervat alleen een eerder gestarte
 plugin automatisch. Start controleert of het model al aanwezig is; alleen een ontbrekend model wordt
 gedownload. Met een gebouwd image en aanwezig model werkt herstart en analyse lokaal zonder internet.
+
+## Updates via LoxBerry
+
+Vanaf 0.3.1 bevat plugin.cfg een stabiele RELEASECFG-updatebron. LoxBerry leest
+release.cfg op GitHub en haalt bij een nieuwere versie het gebouwde installatie-ZIP op.
+Vanaf 0.2.x of 0.3.0 is eenmalig een handmatige ZIP-upgrade nodig: die oude installaties
+hebben nog geen bron om nieuwe versies te ontdekken. Verwijder de plugin niet vooraf.
+
+Open daarna Pluginbeheer en kies bij Q-Brain **Automatic Updates → Releases**.
+Gebruik **Re-Check for Updates** om opnieuw te controleren. Als je de nieuwste versie
+hebt, wordt er uiteraard nog geen nieuwere update aangeboden. De keuze voor automatische
+installatie wordt door LoxBerry beheerd. Er is geen apart prereleasekanaal.
+
+Voor een volgende publicatie: verhoog plugin.cfg en de runtimeversies, bouw eerst
+het overeenkomstige packages/qbrain-loxberry-VERSIE.zip, en publiceer dit samen met
+release.cfg (VERSION, ARCHIVEURL en INFOURL). Behoud oudere versiearchieven. De tests
+controleren versieconsistentie en de metadata van het downloadpakket.
 
 ## Automatisch zoeken: wat deze versie ondersteunt
 

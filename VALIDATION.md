@@ -1,3 +1,10 @@
+# Validatie van Q-Brain 0.3.1
+
+66 tests geslaagd, 2 Linux-specifieke tests overgeslagen op Windows.
+De extra updatefeedtest controleert dat de aangeboden versie en HTTPS-download-URL
+naar het gebouwde pluginpakket verwijzen, met dezelfde identiteit en updatebron.
+De native update-installatie op de fysieke LoxBerry is nog niet uitgevoerd.
+
 # Validatie van Q-Brain 0.3.0
 
 Uitgevoerd op 6 september 2026 met Python 3.12 en PHP 8.4 op Windows:

@@ -231,3 +231,26 @@ def test_missing_model_downloads(controller, monkeypatch):
     controller.run = Mock(side_effect=[control.subprocess.CalledProcessError(1, ['show']), None])
     controller.ensure_model()
     assert controller.run.call_args.args == ('exec', '-T', 'ollama', 'ollama', 'pull', 'qwen3:4b')
+
+
+def test_release_feed_matches_installable_archive():
+    from urllib.parse import urlsplit
+    metadata = configparser.ConfigParser()
+    metadata.read(ROOT / 'plugin.cfg', encoding='utf-8')
+    assert metadata.getboolean('AUTOUPDATE', 'AUTOMATIC_UPDATES')
+    assert metadata['AUTOUPDATE']['RELEASECFG'] == 'https://raw.githubusercontent.com/Q-Home/Q-Brain/main/release.cfg'
+    feed = configparser.ConfigParser()
+    feed.read(ROOT / 'release.cfg', encoding='utf-8')
+    release = feed['AUTOUPDATE']
+    assert release['VERSION'] == metadata['PLUGIN']['VERSION']
+    url = urlsplit(release['ARCHIVEURL'])
+    assert url.scheme == 'https' and url.netloc == 'raw.githubusercontent.com'
+    assert url.path == '/Q-Home/Q-Brain/main/packages/qbrain-loxberry-' + release['VERSION'] + '.zip'
+    with zipfile.ZipFile(ROOT / 'packages' / url.path.split('/')[-1]) as archive:
+        bundled = configparser.ConfigParser()
+        bundled.read_string(archive.read('plugin.cfg').decode())
+        assert bundled['PLUGIN'] == metadata['PLUGIN']
+        assert bundled['AUTHOR'] == metadata['AUTHOR']
+        assert bundled['AUTOUPDATE'] == metadata['AUTOUPDATE']
+        assert 'bin/service/qbox/server.py' in archive.namelist()
+    assert release['INFOURL'] == 'https://github.com/Q-Home/Q-Brain/blob/main/docs/CHANGELOG.md'
