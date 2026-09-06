@@ -1,9 +1,17 @@
-# Q-Box Energy — Docker-plugin MVP
+# Q-Brain — LoxBerry-plugin en lokale energie-assistent
 
 Lokale energie-observatie en AI-advies via **MCP → Loxone** en **Ollama**.
-Dit is een zelfstandig installeerbare sidecar-service. Er is geen Q-Box plugin-SDK of
-installatiemanifest aangeleverd; registratie in een bestaande Q-Box pluginmanager
-is daarom nog een integratiestap.
+Versie 0.2.0 voegt een **LoxBerry 4-plugin** toe met een native configuratiepagina,
+servicebeheer, installatie-/upgradehooks en een bouwbaar plugin-ZIP. De bestaande
+Docker-service blijft ook zelfstandig bruikbaar.
+
+**LoxBerry installeren:** volg [de LoxBerry-handleiding](docs/LOXBERRY.md).
+Download [het installatie-ZIP](https://github.com/Q-Home/Q-Brain/raw/refs/heads/main/packages/qbrain-loxberry-0.2.0.zip).
+Bouw het installatiepakket met `python scripts/build_loxberry.py`. Gebruik het
+gegenereerde ZIP onder `dist/`, niet het GitHub-broncodearchief.
+
+De LoxBerry-variant is altijd observe-only. De onderstaande configuratie van
+optionele EV-writes geldt uitsluitend voor de zelfstandige Docker-variant.
 
 ## Wat werkt
 
@@ -39,7 +47,7 @@ elke 300 seconden, gerekend vanaf het einde van de vorige cyclus. Bij fouten bli
 de agent draaien en probeert hij pas in de volgende cyclus opnieuw. Alleen advies
 wordt herhaald; een onzekere fysieke schrijfactie wordt nooit automatisch herhaald.
 
-## Snel starten op de Q-Box
+## Zelfstandig starten met Docker
 
 Vereist: Docker Engine met Compose v2 en een Linux amd64/arm64-host waarop de images
 kunnen draaien. De Q-Box-hardware en beschikbare RAM zijn nog niet bekend; kies en
@@ -227,8 +235,8 @@ qbox-service tijdelijk stil en kopieer daarna de database uit het volume.
 - `agent.py`: planning, backoff en Q-Portal-invoer. Voeg automatische uitvoering pas
   toe met een afzonderlijk gevalideerd plan-/expirycontract en installatietests.
 
-Geen prijsoptimalisator, voorspeller, automatische besturing, Q-Portal-koppeling of
-Q-Box pluginmanagerregistratie is in dit MVP inbegrepen. Zonder echte hardwaretest
+Geen prijsoptimalisator, voorspeller, automatische besturing of Q-Portal-koppeling
+is in dit MVP inbegrepen. Zonder echte hardwaretest
 is de Loxone-compatibiliteit op jouw installatie nog niet bewezen.
 
 ## Officiële referenties

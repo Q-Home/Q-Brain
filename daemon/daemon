@@ -1,0 +1,7 @@
+#!/bin/bash
+# LoxBerry runs this root-owned hook at boot. Each controller returns immediately.
+set -eu
+for controller in /usr/local/lib/qbrain/*/control.py; do
+  [ -f "$controller" ] || continue
+  "$controller" boot >/dev/null 2>&1 &
+done

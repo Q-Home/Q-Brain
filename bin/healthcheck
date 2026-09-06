@@ -1,0 +1,26 @@
+#!/usr/bin/python3 -I
+"""LoxBerry healthcheck contract: title/check, JSON status 3/4/5/6."""
+import json
+from pathlib import Path
+import subprocess
+import sys
+
+title = 'Q-Brain lokale energie-assistent'
+if len(sys.argv) > 1 and sys.argv[1] == 'title':
+    print(title)
+    sys.exit(0)
+folder = Path(__file__).resolve().parent.name
+try:
+    response = subprocess.run(['/usr/bin/sudo', '-n', f'/usr/local/lib/qbrain/{folder}/control.py', 'status'],
+                              capture_output=True, text=True, timeout=40, check=True)
+    state = json.loads(response.stdout)
+    if not state['desired_running']:
+        code, result = 6, 'Q-Brain is gestopt; start via de pluginpagina.'
+    elif state['ready']:
+        code, result = 5, 'Q-Brain is gereed (observe-only).'
+    else:
+        code, result = 4, 'Q-Brain is nog niet gereed; controleer de pluginpagina.'
+except Exception:
+    code, result = 3, 'Q-Brain controller niet bereikbaar.'
+print(json.dumps({'desc': title, 'status': code, 'result': result,
+                  'url': 'https://github.com/Q-Home/Q-Brain/blob/main/docs/LOXBERRY.md'}))

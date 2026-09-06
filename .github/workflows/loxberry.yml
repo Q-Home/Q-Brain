@@ -1,0 +1,30 @@
+name: LoxBerry plugin validation
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install -r requirements-dev.lock && pip install --no-deps -e .
+      - run: pytest -q
+      - name: Check PHP and installation scripts
+        run: |
+          php -l webfrontend/htmlauth/index.php
+          php -l templates/index.php
+          bash -n preinstall.sh preroot.sh postroot.sh daemon/daemon uninstall/uninstall
+      - name: Build Docker service
+        run: docker build -t qbrain-ci .
+      - name: Build LoxBerry plugin
+        run: python scripts/build_loxberry.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: qbrain-loxberry-plugin
+          path: dist/qbrain-loxberry-*.zip

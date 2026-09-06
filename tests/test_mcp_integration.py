@@ -18,6 +18,11 @@ from qbox.config import Settings
 TOKEN = "integration-token-012345678901234567890"
 
 
+class FixtureServer(ThreadingHTTPServer):
+    # A snapshot opens five connections at once, followed by the Ollama check.
+    request_queue_size = 32
+
+
 class OllamaFixture(BaseHTTPRequestHandler):
     def log_message(self, *args):
         pass
@@ -41,7 +46,7 @@ class OllamaFixture(BaseHTTPRequestHandler):
 
 @pytest.fixture(params=[False, True], ids=["observe", "controlled-write"])
 def running_service(tmp_path, request):
-    mock = ThreadingHTTPServer(("127.0.0.1", 0), OllamaFixture)
+    mock = FixtureServer(("127.0.0.1", 0), OllamaFixture)
     thread = threading.Thread(target=mock.serve_forever, daemon=True)
     thread.start()
     with socket.socket() as sock:
@@ -82,7 +87,7 @@ async def test_full_mcp_cycle(running_service):
     async with httpx.AsyncClient(trust_env=False) as client:
         assert (await client.get(url + "/readyz")).status_code == 401
         assert (await client.post(url + "/mcp", json={})).status_code == 401
-    async with httpx.AsyncClient(headers={"Authorization": f"Bearer {TOKEN}"}, trust_env=False) as client:
+    async with httpx.AsyncClient(headers={"Authorization": f"Bearer {TOKEN}"}, trust_env=False, timeout=15) as client:
         assert (await client.get(url + "/readyz")).status_code == 200
         async with streamable_http_client(url + "/mcp", http_client=client) as (read, write, _):
             async with ClientSession(read, write) as session:
