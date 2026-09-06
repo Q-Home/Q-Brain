@@ -17,7 +17,7 @@ class SignalProposal(BaseModel):
 class DiscoveryAnalysis(BaseModel):
     model_config = ConfigDict(extra='forbid')
     summary: str = Field(min_length=1, max_length=2000)
-    proposals: list[SignalProposal] = Field(max_length=30)
+    proposals: list[SignalProposal] = Field(max_length=8)
     missing_information: list[str] = Field(max_length=10)
 
 
@@ -28,6 +28,8 @@ Meter.actual and Wallbox2.actual are power only if actualFormat explicitly conta
 Wallbox2.limit and Slider.position are SETTINGS, not measured power or battery SOC. InfoOnlyDigital/TextState are statuses, not power.
 Multiple meters/chargers must remain individually identified. Do not sum nested/shared meters or average battery SOC without topology/capacity.
 Propose likely semantic roles and explain missing data and uncertainty, especially grid/battery polarity. These are proposals only.
+EnergyManager2 has fixed units: Gpwr grid kW positive import, Ppwr production kW, Spwr storage kW NEGATIVE charging, Ssoc charge percent. HasSsoc/HasSpwr false means unavailable. Never reinterpret these roles.
+Return at most 8 priority proposals with short reasons.
 Report discovery even when no live values are available. Output JSON matching the schema.'''
 
 
@@ -39,7 +41,7 @@ def inventory(document):
         states = row.get('states') or ({'value': row['id']} if row.get('type') == 'InfoOnlyAnalog' else {})
         result.append({'control_id': row['id'], 'name': str(row.get('name',''))[:128],
                        'type': row.get('type',''), 'room': row.get('room',''), 'category': row.get('category',''),
-                       'format': row.get('format',''), 'details': row.get('details',{}),
+                       'format': row.get('format',''), 'details': row.get('details') or {},
                        'states': list(states), 'values': row.get('state_values') or {'value':row.get('value')},
                        'read_status': row.get('status','unknown')})
     return result
@@ -60,6 +62,11 @@ def validated_proposals(analysis, rows):
         if not row or item.state not in row['states'] or pair in seen:
             continue
         seen.add(pair)
+        if row['type'] == 'EnergyManager2':
+            from .discovery import MANAGER_FIELDS
+            expected = MANAGER_FIELDS.get(item.state)
+            if not expected or item.role != expected[0] or row['details'].get('Has' + item.state) in (False, 0):
+                continue
         # The model can describe settings/statuses but cannot relabel them as energy measurements.
         if row['type'] == 'Slider' and item.role != 'setting':
             continue

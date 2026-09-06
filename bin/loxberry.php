@@ -101,10 +101,10 @@ try {
                             $candidates[(string)$uuid]['states'][$field]=strtolower($state);
                         }
                     }
-                    foreach (['type','actualFormat','totalFormat','storageFormat','storageMax','format','min','max','connectedInputs'] as $field) {
+                    foreach (['type','actualFormat','totalFormat','storageFormat','storageMax','format','min','max','connectedInputs','HasSsoc','HasSpwr'] as $field) {
                         $detail=$control['details'][$field] ?? null;
                         if (is_string($detail)) { $candidates[(string)$uuid]['details'][$field]=substr($detail,0,128); }
-                        elseif (is_numeric($detail)) { $candidates[(string)$uuid]['details'][$field]=$detail; }
+                        elseif (is_bool($detail) || is_numeric($detail)) { $candidates[(string)$uuid]['details'][$field]=$detail; }
                     }
                 }
                 if (is_array($control['subControls'] ?? null)) { $scan($control['subControls'], $depth + 1); }

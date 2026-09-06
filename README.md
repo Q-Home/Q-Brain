@@ -1,7 +1,7 @@
 # Q-Brain — LoxBerry-plugin en lokale energie-assistent
 
 Lokale energie-observatie en AI-advies via **MCP → Loxone** en **Ollama**.
-Versie 0.4.0 hergebruikt de Miniserver via de LoxBerry PHP SDK, zoekt automatisch
+Versie 0.4.1 hergebruikt de Miniserver via de LoxBerry PHP SDK, zoekt automatisch
 naar ondersteunde energiemeetpunten en toont lokale analyses. Eén startknop regelt
 services en modeldownload. Credentials blijven op de LoxBerry-host. Niet ondersteunde
 blokken en dubbelzinnige meetpunten worden expliciet gemeld; zie de handleiding.
@@ -10,7 +10,11 @@ De zelfstandige Docker-variant met handmatige mappings blijft beschikbaar.
 Sinds 0.2.1 installeert het pluginpakket ontbrekende hostdependencies, waaronder
 Docker Engine, Compose en Buildx. 0.3.1 voegt PHP curl/XML toe.
 
-**Nieuw in 0.4.0:** WebSocket-uitlezing van Meter en Wallbox2, meetwaarden per apparaat
+**Nieuw in 0.4.1:** vaste EnergyManager2-herkenning voor netvermogen, productie,
+batterijvermogen en SOC. De agent start na modelvoorbereiding; modelproblemen
+worden met een gerichte foutmelding getoond.
+
+**Sinds 0.4.0:** WebSocket-uitlezing van Meter en Wallbox2, meetwaarden per apparaat
 en het lokale ontdekkingsmodel `qbrain-discovery:latest`. Dit onderzoekt blokken,
 state-velden en ontbrekende informatie, ook zonder volledige energiesnapshot.
 Het hergebruikt de gewichten van het ingestelde Ollama-model.
@@ -24,7 +28,7 @@ SDK-foutmeldingen en lokaal bouwen voordat Q-Brain en de agent starten.
 is eenmalig de nieuwe ZIP-installatie nodig om de updatebron toe te voegen.
 
 **LoxBerry installeren:** volg [de LoxBerry-handleiding](docs/LOXBERRY.md).
-Download [het installatie-ZIP](https://github.com/Q-Home/Q-Brain/raw/refs/heads/main/packages/qbrain-loxberry-0.4.0.zip).
+Download [het installatie-ZIP](https://github.com/Q-Home/Q-Brain/raw/refs/heads/main/packages/qbrain-loxberry-0.4.1.zip).
 Bouw het installatiepakket met `python scripts/build_loxberry.py`. Gebruik het
 gegenereerde ZIP onder `dist/`, niet het GitHub-broncodearchief.
 

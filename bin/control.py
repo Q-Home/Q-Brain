@@ -92,7 +92,7 @@ def compose_document(settings, runtime, folder):
     env.update(MCP_TOKEN=settings['mcp_token'], OBSERVE_ONLY='true', ENABLE_EV_WRITE='false',
                OLLAMA_URL='http://ollama:11434', HISTORY_PATH='/data/history.sqlite3')
     env = {k: v.replace('$', '$$') for k, v in env.items()}
-    common = {'image': 'qbrain-' + folder + ':0.4.0', 'environment': env,
+    common = {'image': 'qbrain-' + folder + ':0.4.1', 'environment': env,
               'pull_policy': 'never', 'read_only': True, 'tmpfs': ['/tmp'], 'cap_drop': ['ALL'],
               'security_opt': ['no-new-privileges:true'], 'restart': 'unless-stopped',
               'logging': {'driver': 'json-file', 'options': {'max-size': '10m', 'max-file': '3'}}}
@@ -299,10 +299,11 @@ class Controller:
                 if self.settings()['loxberry_sdk'] and not self.settings()['demo_mode']:
                     self.start_collector()
                 self.run('build', 'qbox')
-                self.run('up', '-d', '--no-build', 'qbox', 'ollama', 'agent')
+                self.run('up', '-d', '--no-build', 'qbox', 'ollama')
                 self.ensure_model()
                 if self.settings()['loxberry_sdk'] and not self.settings()['demo_mode']:
                     self.run('exec','-T','ollama','ollama','create','qbrain-discovery:latest','-f','/qbrain-discovery.Modelfile',timeout=180)
+                self.run('up', '-d', '--no-build', 'agent')
                 atomic_json(self.state / 'applied.json', {'revision': self.settings()['revision']})
             elif action == 'stop':
                 if self.compose_file.exists():

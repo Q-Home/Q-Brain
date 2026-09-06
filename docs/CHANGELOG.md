@@ -1,5 +1,13 @@
 # Wijzigingen
 
+## 0.4.1
+
+- EnergyManager2: Gpwr/Ppwr/Spwr/Ssoc rechtstreeks herkennen en normaliseren, inclusief omgekeerd laadteken.
+- Expliciet ongeldige opslaginputs en meerdere managers blijven onbekend.
+- Gevonden globale waarden met eenheden zichtbaar in de plugin.
+- Agentstart na modelvoorbereiding; begrensde ontdekkingsantwoorden en gerichte AI-foutmeldingen.
+- Lege PHP-detailslijsten maken metingen per apparaat niet langer ongeldig.
+
 ## 0.4.0
 
 - Numerieke WebSocket-states voor Meter, Wallbox2 en andere ondersteunde velden, met centrale LoxBerry-credentials.

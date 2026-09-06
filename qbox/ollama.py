@@ -1,4 +1,18 @@
 import httpx
+from pydantic import ValidationError
+
+def analysis_failure(error):
+    if isinstance(error, httpx.TimeoutException):
+        return {"code":"model_timeout", "message":"Het lokale model antwoordde niet binnen de tijdslimiet. De volgende cyclus probeert opnieuw; een kleiner model kan helpen op deze host."}
+    if isinstance(error, httpx.HTTPStatusError):
+        status = error.response.status_code
+        return {"code":"model_http_" + str(status), "message": "Ollama meldt HTTP " + str(status) + (". Het gevraagde model is niet beschikbaar." if status == 404 else ". Controleer de Ollama-service en het beschikbare geheugen.")}
+    if isinstance(error, httpx.RequestError):
+        return {"code":"model_connection", "message":"De lokale Ollama-service is niet bereikbaar."}
+    if isinstance(error, (ValidationError, ValueError, KeyError)):
+        return {"code":"invalid_model_response", "message":"Het model gaf geen geldig gestructureerd antwoord. De volgende cyclus probeert opnieuw."}
+    return {"code":"analysis_failed", "message":"Analyse mislukt bij de verwerking van lokale gegevens."}
+
 from .models import Advice, Snapshot
 from .discovery_ai import DiscoveryAnalysis, DISCOVERY_PROMPT, validated_proposals
 

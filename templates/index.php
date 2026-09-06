@@ -97,7 +97,7 @@
     text('discovery-status', data.sdk?.error || discovery.error || (data.demo_mode ? 'Fictieve demowaarden.' : 'Ontbrekende of dubbelzinnige meetpunten blijven onbekend. Vermogensrichting moet expliciet bekend zijn.'));
     const labels = {grid_power: 'Netvermogen', pv_power: 'Zonnepanelen', battery_soc: 'Batterijlading', battery_power: 'Batterijvermogen', ev_power: 'Laadpaal'};
     const states = {found: 'gevonden', missing: 'niet herkend', ambiguous: 'meerdere kandidaten', invalid: 'ongeldige waarde'};
-    list('signals', Object.entries(discovery.signals || {}).map(([key, value]) => labels[key] + ': ' + (states[value.status] || value.status)));
+    list('signals', Object.entries(discovery.signals || {}).map(([key, value]) => labels[key] + ': ' + (states[value.status] || value.status) + (value.value != null ? ' — ' + value.value.toLocaleString() + ' ' + value.unit : '')));
     list('readings', (discovery.readings || []).map(x => x.name + ' (' + x.type + '): ' +
       (x.status === 'read' ? (Object.entries(x.state_values || {}).filter(([,v]) => v !== null).map(([k,v]) => k + '=' + v).join(', ') || String(x.value)) + ' / ' + x.format :
        x.status === 'state_missing' ? 'wacht op actuele Loxone-statuswaarden' : x.status === 'unsupported_control' ? 'alleen metadata beschikbaar' : 'niet leesbaar')));
@@ -108,7 +108,7 @@
     list('discovery-proposals', (analysis?.payload?.proposals || []).map(x => x.name + ' / ' + x.state + ' → ' + x.role + ': ' + x.reason));
     list('discovery-missing', analysis?.payload?.missing_information || []);
     const latest = (data.overview?.history || []).find(x => x.kind === 'advice');
-    text('advice', latest ? latest.payload.advice.summary : 'Nog geen analyse. Q-Brain wacht op leesbare meetwaarden en het AI-model.');
+    text('advice', latest ? latest.payload.advice.summary : (data.overview?.analysis_error?.payload?.message || 'Nog geen analyse. Q-Brain wacht op leesbare meetwaarden en het AI-model.'));
     text('advice-time', latest ? 'Bron: ' + latest.payload.source + ' — analyse van ' + new Date(latest.timestamp * 1000).toLocaleString() + ' — zekerheid: ' + latest.payload.advice.confidence : '');
   }
   form.addEventListener('submit', async event => {

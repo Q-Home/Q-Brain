@@ -1,3 +1,13 @@
+# Validatie van Q-Brain 0.4.1
+
+89 tests geslaagd, 2 Linux-specifieke tests overgeslagen op Windows.
+De aangeleverde EnergyManager2-waarden zijn gebruikt voor regressietests: 0.72 kW
+wordt 720 W, nul blijft geldig, SOC behoudt precisie. Negatieve Spwr wordt positief
+laadvermogen. Meerdere managers, ongeldige waarden en expliciet niet-aangesloten
+inputs worden niet als geldige globale meting gebruikt. Lege PHP-detailsarrays en
+geschoonde model-foutmeldingen zijn getest. Echte Ollama-inference op de gebruikershost
+is niet uitgevoerd; de installatielog bevat daarvoor geen diagnose.
+
 # Validatie van Q-Brain 0.4.0
 
 84 tests geslaagd, 2 Linux-specifieke tests overgeslagen op Windows.

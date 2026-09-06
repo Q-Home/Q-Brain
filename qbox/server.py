@@ -17,7 +17,7 @@ from .history import History
 from .logging import event, setup_logging
 from .loxone import LoxoneAdapter
 from .discovery import LoxBerryAdapter
-from .ollama import OllamaClient
+from .ollama import OllamaClient, analysis_failure
 from .policy import EnergyService
 
 
@@ -94,9 +94,10 @@ def create_app(config=None):
                 if isinstance(adapter, LoxBerryAdapter):
                     try:
                         discovery = await run_discovery()
-                    except Exception:
-                        event('discovery_failed')
-                        history.append('discovery_error', {'message':'Ontdekkingsanalyse nog niet beschikbaar. Controleer het model en probeer de volgende cyclus.'})
+                    except Exception as error:
+                        failure = analysis_failure(error)
+                        event('discovery_failed', code=failure['code'])
+                        history.append('discovery_error', failure)
                 try:
                     snapshot = await service.snapshot()
                 except Exception:
@@ -109,8 +110,10 @@ def create_app(config=None):
                 history.append("advice", record)
                 event("advice_recorded", source=snapshot.source, executed=False)
                 return record
-            except Exception:
-                event("analysis_failed")
+            except Exception as error:
+                failure = analysis_failure(error)
+                history.append("analysis_error", failure)
+                event("analysis_failed", code=failure["code"])
                 raise ValueError("Analysis unavailable; check Loxone, Ollama and local storage") from None
 
     # Disabled write tools are absent from discovery, with policy checks as a second layer.
@@ -134,7 +137,7 @@ def create_app(config=None):
 
     async def overview(request):
         # Cached local records only; never wait for Miniserver or model in the UI.
-        result = {"history": history.recent(6), "discovery": {}, "installation_analysis": history.latest("discovery"), "discovery_error": history.latest("discovery_error")}
+        result = {"history": history.recent(6), "discovery": {}, "installation_analysis": history.latest("discovery"), "discovery_error": history.latest("discovery_error"), "analysis_error": history.latest("analysis_error")}
         if isinstance(adapter, LoxBerryAdapter):
             try:
                 result["discovery"] = await adapter.discovery()

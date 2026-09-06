@@ -1,4 +1,4 @@
-# Q-Brain voor LoxBerry 4 — versie 0.4.0
+# Q-Brain voor LoxBerry 4 — versie 0.4.1
 
 Q-Brain gebruikt de Miniserver die al in LoxBerry is ingesteld. De lokale
 LoxBerry PHP SDK leest de verbinding en meetwaarden; alleen meetgegevens gaan
@@ -11,7 +11,7 @@ Deze plugin werkt uitsluitend in observe-only: hij stuurt geen apparaten aan.
    De installer installeert ontbrekende Python 3, sudo, PHP CLI, PHP curl/XML,
    CA-certificaten, curl, Docker Engine, Compose en Buildx. Bestaande Docker-installaties
    blijven behouden. De SDK zelf wordt door LoxBerry geleverd.
-2. Upload [qbrain-loxberry-0.4.0.zip](https://github.com/Q-Home/Q-Brain/raw/refs/heads/main/packages/qbrain-loxberry-0.4.0.zip)
+2. Upload [qbrain-loxberry-0.4.1.zip](https://github.com/Q-Home/Q-Brain/raw/refs/heads/main/packages/qbrain-loxberry-0.4.1.zip)
    bij LoxBerry → Pluginbeheer. Gebruik het installatiepakket, niet GitHub Download ZIP.
 3. Open Q-Brain. Eén geconfigureerde Miniserver wordt automatisch gekozen.
    Bij meerdere Miniservers kies je er één. Zonder Miniserver voeg je die eerst
@@ -64,7 +64,7 @@ InfoOnlyAnalog zonder state-UUID behoudt de bestaande scalar-HTTP-reader.
 | Meter | Actueel vermogen via `actual`; opslaginhoud via `storage` wanneer type en eenheid bekend zijn |
 | Wallbox2 | Werkelijk laadvermogen via `actual`, afzonderlijk per laadpunt |
 | InfoOnlyAnalog | Numerieke waarde met expliciete eenheid; bestaande naamherkenning |
-| EnergyManager2 | Numerieke states worden verzameld voor de ontdekkingsanalyse |
+| EnergyManager2 | Gpwr, Ppwr, Spwr en Ssoc leveren globale energiewaarden met vaste eenheden |
 | Slider / TextState / InfoOnlyDigital | Metadata voor context; instellingen en online-status gelden niet als energiemeting |
 
 De formattering bepaalt de eenheid. kW wordt naar W omgerekend. Batterijopslag
@@ -207,3 +207,23 @@ De CI controleert Python, PHP, Bash, Docker-build en pakketopbouw.
 De WebSocket-reader is getest tegen een lokale protocolfixture met TLS, SHA1/SHA256,
 fragmentatie, ping/pong en numerieke tabellen. Compatibiliteit en modelkwaliteit op
 de fysieke installatie moeten na deze update nog worden bevestigd.
+
+## EnergyManager2 vanaf 0.4.1
+
+De gedocumenteerde veldnamen zijn Gpwr (netvermogen), Ppwr (productie), Spwr
+(opslagvermogen) en Ssoc (SOC). Vermogen staat in kW, SOC in procent. Deze rollen
+worden rechtstreeks herkend zonder AI of handmatige naamgeving. Gpwr is positief
+bij netafname. Spwr is negatief bij laden; Q-Brain draait dat teken om voor zijn
+snapshotconventie positief=laden. Zie de [officiële blokdocumentatie](https://www.loxone.com/enus/kb/energy-manager-2/).
+
+Een EnergyManager2 heeft voorrang op naamherkenning van deelmeters. Meerdere managers
+blijven dubbelzinnig. Expliciete HasSsoc=false en HasSpwr=false worden gerespecteerd.
+De vier laadpunten blijven aparte observaties; er wordt geen onzekere som gemaakt.
+Het overzicht toont nu ook de genormaliseerde waarde en eenheid bij gevonden signalen.
+
+De agent start pas na het voorbereiden van beide modelprofielen. AI-ontdekking vraagt
+maximaal acht voorstellen per antwoord om de uitvoer te begrenzen. Bij een fout toont
+de pagina nu timeout, onbereikbare Ollama, HTTP-status of ongeldig modelantwoord,
+zonder ruwe prompts of secrets te tonen. Een geslaagde modelinstallatie bewijst niet
+dat inference op de host binnen de tijdslimiet lukt. De aangeleverde 0.4.0-log bevestigt
+modelcreatie en telemetrie, maar bevat geen oorzaak van de mislukte AI-aanroep.

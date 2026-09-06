@@ -266,7 +266,7 @@ def test_local_image_is_built_before_start_and_never_pulled(controller, monkeypa
     monkeypatch.setattr(control.os, 'close', lambda fd: None)
     controller.worker('start', 123)
     assert controller.run.call_args_list[0].args == ('build', 'qbox')
-    assert controller.run.call_args_list[1].args == ('up', '-d', '--no-build', 'qbox', 'ollama', 'agent')
+    assert controller.run.call_args_list[1].args == ('up', '-d', '--no-build', 'qbox', 'ollama')
 
 
 def test_sdk_failure_is_preserved_without_stderr_or_raw_error(controller, monkeypatch):
